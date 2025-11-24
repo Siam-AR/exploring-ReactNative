@@ -1,56 +1,148 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import Header from '../components/Header';
-import Input from '../components/Input';
-import Button from '../components/Button';
-import Card from '../components/Card';
-import { colors, typography, spacing, borderRadius, layout } from '../theme/theme';
+import React, { useEffect, useState } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  Switch,
+  Alert,
+  ActivityIndicator,
+} from "react-native";
+import { useNavigation } from "@react-navigation/native";
+import Header from "../components/Header";
+import Input from "../components/Input";
+import Button from "../components/Button";
+import Card from "../components/Card";
+import {
+  colors,
+  typography,
+  spacing,
+  borderRadius,
+  layout,
+} from "../theme/theme";
 
-type ActiveTab = 'login' | 'register';
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { loginUser, registerUser } from "../api/auth";
+
+type ActiveTab = "login" | "register";
 
 /**
  * ProfileScreen
- * User profile with login/register and profile management
+ * Connected login/register that stores JWT & user in AsyncStorage
  */
 const ProfileScreen: React.FC = () => {
   const navigation = useNavigation();
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
-  const [activeTab, setActiveTab] = useState<ActiveTab>('login');
-  const [email, setEmail] = useState<string>('');
-  const [password, setPassword] = useState<string>('');
-  const [name, setName] = useState<string>('');
+  const [activeTab, setActiveTab] = useState<ActiveTab>("login");
+  const [email, setEmail] = useState<string>("");
+  const [password, setPassword] = useState<string>("");
+  const [name, setName] = useState<string>("");
   const [isAvailable, setIsAvailable] = useState<boolean>(true);
 
-  const handleLogin = (): void => {
+  const [loading, setLoading] = useState<boolean>(false);
+  const [user, setUser] = useState<{ name?: string; email?: string } | null>(
+    null
+  );
+
+  // On mount -> attempt to restore session from AsyncStorage
+  useEffect(() => {
+    (async () => {
+      try {
+        const token = await AsyncStorage.getItem("token");
+        const userJson = await AsyncStorage.getItem("user");
+        if (token && userJson) {
+          setUser(JSON.parse(userJson));
+          setIsLoggedIn(true);
+        }
+      } catch (err) {
+        console.warn("Error restoring session:", err);
+      }
+    })();
+  }, []);
+
+  // --------------------------
+  // 🔐 LOGIN (Real Backend)
+  // --------------------------
+  const handleLogin = async (): Promise<void> => {
     if (!email || !password) {
-      Alert.alert('Error', 'Please fill all fields');
+      Alert.alert("Error", "Please fill all fields");
       return;
     }
-    console.log('Logging in:', email);
-    setIsLoggedIn(true);
+
+    setLoading(true);
+    try {
+      const res = await loginUser({ email, password });
+      const { token, user: resUser } = res.data;
+
+      // Persist token and user
+      await AsyncStorage.setItem("token", token);
+      await AsyncStorage.setItem("user", JSON.stringify(resUser));
+
+      setUser(resUser);
+      setIsLoggedIn(true);
+      setEmail("");
+      setPassword("");
+
+      Alert.alert("Success", "Logged in successfully");
+    } catch (error: any) {
+      const msg = error?.response?.data?.message || error.message || "Login failed";
+      Alert.alert("Login failed", msg);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleRegister = (): void => {
+  // --------------------------
+  // 📝 REGISTER (Real Backend)
+  // --------------------------
+  const handleRegister = async (): Promise<void> => {
     if (!name || !email || !password) {
-      Alert.alert('Error', 'Please fill all fields');
+      Alert.alert("Error", "Please fill all fields");
       return;
     }
-    console.log('Registering:', { name, email });
-    setIsLoggedIn(true);
+
+    setLoading(true);
+    try {
+      await registerUser({ name, email, password });
+
+      // After registration, switch to login tab and prefill email
+      Alert.alert("Success", "Registration successful — please login");
+      setActiveTab("login");
+      setPassword("");
+    } catch (error: any) {
+      const msg =
+        error?.response?.data?.message || error.message || "Registration failed";
+      Alert.alert("Registration failed", msg);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleLogout = (): void => {
+  // --------------------------
+  // 🚪 LOGOUT
+  // --------------------------
+  const handleLogout = async (): Promise<void> => {
+    try {
+      await AsyncStorage.removeItem("token");
+      await AsyncStorage.removeItem("user");
+    } catch (err) {
+      console.warn("Error clearing storage:", err);
+    }
     setIsLoggedIn(false);
-    setEmail('');
-    setPassword('');
-    setName('');
+    setUser(null);
+    setEmail("");
+    setPassword("");
+    setName("");
   };
 
-  if (isLoggedIn) {
+  // ===========================
+  // UI: Logged-in profile view
+  // ===========================
+  if (isLoggedIn && user) {
     return (
       <View style={styles.container}>
-        <Header 
+        <Header
           title="My Profile"
           leftAction={{
             icon: <Text style={styles.backIcon}>←</Text>,
@@ -58,7 +150,7 @@ const ProfileScreen: React.FC = () => {
           }}
         />
 
-        <ScrollView 
+        <ScrollView
           style={styles.scrollView}
           contentContainerStyle={styles.content}
           showsVerticalScrollIndicator={false}
@@ -68,11 +160,11 @@ const ProfileScreen: React.FC = () => {
             <View style={styles.avatarLarge}>
               <Text style={styles.avatarEmojiLarge}>👤</Text>
             </View>
-            <Text style={styles.profileName}>Ahmed Rahman</Text>
-            <Text style={styles.profileEmail}>ahmed@example.com</Text>
+            <Text style={styles.profileName}>{user.name ?? "Unknown"}</Text>
+            <Text style={styles.profileEmail}>{user.email ?? "—"}</Text>
           </Card>
 
-          {/* Stats Card */}
+          {/* Stats Card (static for now) */}
           <Card style={styles.statsCard} padding={spacing.base}>
             <View style={styles.statsRow}>
               <View style={styles.statItem}>
@@ -110,10 +202,9 @@ const ProfileScreen: React.FC = () => {
             </View>
           </Card>
 
-          {/* Action Buttons */}
           <Button
             title="Edit Profile"
-            onPress={() => console.log('Edit profile')}
+            onPress={() => console.log("Edit profile")}
             variant="primary"
             size="large"
             fullWidth
@@ -132,9 +223,12 @@ const ProfileScreen: React.FC = () => {
     );
   }
 
+  // ===========================
+  // UI: Login / Register Form
+  // ===========================
   return (
     <View style={styles.container}>
-      <Header 
+      <Header
         title="Profile"
         leftAction={{
           icon: <Text style={styles.backIcon}>←</Text>,
@@ -142,7 +236,7 @@ const ProfileScreen: React.FC = () => {
         }}
       />
 
-      <ScrollView 
+      <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
@@ -150,28 +244,30 @@ const ProfileScreen: React.FC = () => {
         {/* Tabs */}
         <View style={styles.tabs}>
           <TouchableOpacity
-            style={[styles.tab, activeTab === 'login' && styles.tabActive]}
-            onPress={() => setActiveTab('login')}
+            style={[styles.tab, activeTab === "login" && styles.tabActive]}
+            onPress={() => setActiveTab("login")}
             activeOpacity={0.7}
           >
-            <Text style={[styles.tabText, activeTab === 'login' && styles.tabTextActive]}>
+            <Text style={[styles.tabText, activeTab === "login" && styles.tabTextActive]}>
               Login
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.tab, activeTab === 'register' && styles.tabActive]}
-            onPress={() => setActiveTab('register')}
+            style={[styles.tab, activeTab === "register" && styles.tabActive]}
+            onPress={() => setActiveTab("register")}
             activeOpacity={0.7}
           >
-            <Text style={[styles.tabText, activeTab === 'register' && styles.tabTextActive]}>
+            <Text
+              style={[styles.tabText, activeTab === "register" && styles.tabTextActive]}
+            >
               Register
             </Text>
           </TouchableOpacity>
         </View>
 
-        {/* Login/Register Form */}
+        {/* Form Card */}
         <Card style={styles.formCard} padding={spacing.lg}>
-          {activeTab === 'register' && (
+          {activeTab === "register" && (
             <Input
               label="Full Name"
               placeholder="Enter your name"
@@ -200,12 +296,14 @@ const ProfileScreen: React.FC = () => {
           />
 
           <Button
-            title={activeTab === 'login' ? 'Login' : 'Register'}
-            onPress={activeTab === 'login' ? handleLogin : handleRegister}
+            title={activeTab === "login" ? "Login" : "Register"}
+            onPress={activeTab === "login" ? handleLogin : handleRegister}
             variant="primary"
             size="large"
             fullWidth
           />
+
+          {loading && <ActivityIndicator style={{ marginTop: 12 }} />}
         </Card>
       </ScrollView>
     </View>
@@ -229,7 +327,7 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
   },
   tabs: {
-    flexDirection: 'row',
+    flexDirection: "row",
     marginBottom: spacing.base,
     backgroundColor: colors.card,
     borderRadius: borderRadius.base,
@@ -238,7 +336,7 @@ const styles = StyleSheet.create({
   tab: {
     flex: 1,
     paddingVertical: spacing.md,
-    alignItems: 'center',
+    alignItems: "center",
     borderRadius: borderRadius.sm,
   },
   tabActive: {
@@ -259,7 +357,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   profileCard: {
-    alignItems: 'center',
+    alignItems: "center",
     marginBottom: spacing.base,
   },
   avatarLarge: {
@@ -267,15 +365,15 @@ const styles = StyleSheet.create({
     height: 96,
     borderRadius: 48,
     backgroundColor: colors.backgroundDark,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     marginBottom: spacing.base,
   },
   avatarEmojiLarge: {
     fontSize: 48,
   },
   profileName: {
-    fontSize: typography.fontSize['2xl'],
+    fontSize: typography.fontSize["2xl"],
     fontWeight: typography.fontWeight.bold,
     color: colors.textPrimary,
     marginBottom: spacing.xs,
@@ -288,15 +386,15 @@ const styles = StyleSheet.create({
     marginBottom: spacing.base,
   },
   statsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   statItem: {
     flex: 1,
-    alignItems: 'center',
+    alignItems: "center",
   },
   statValue: {
-    fontSize: typography.fontSize['3xl'],
+    fontSize: typography.fontSize["3xl"],
     fontWeight: typography.fontWeight.bold,
     color: colors.primary,
     marginBottom: spacing.xs,
@@ -314,9 +412,9 @@ const styles = StyleSheet.create({
     marginBottom: spacing.base,
   },
   availabilityRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   availabilityTitle: {
     fontSize: typography.fontSize.lg,
