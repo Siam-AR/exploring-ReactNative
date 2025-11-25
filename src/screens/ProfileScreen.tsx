@@ -1,3 +1,7 @@
+// --------------------------
+// ProfileScreen.tsx (UPDATED)
+// --------------------------
+
 import React, { useEffect, useState } from "react";
 import {
   View,
@@ -27,25 +31,42 @@ import { loginUser, registerUser } from "../api/auth";
 
 type ActiveTab = "login" | "register";
 
-/**
- * ProfileScreen
- * Connected login/register that stores JWT & user in AsyncStorage
- */
+const ROLES = ["Consumer", "Helper"];
+const BLOOD_GROUPS = [
+  "A+",
+  "A-",
+  "B+",
+  "B-",
+  "AB+",
+  "AB-",
+  "O+",
+  "O-",
+];
+
 const ProfileScreen: React.FC = () => {
   const navigation = useNavigation();
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<ActiveTab>("login");
+
+  const [name, setName] = useState<string>("");
   const [email, setEmail] = useState<string>("");
   const [password, setPassword] = useState<string>("");
-  const [name, setName] = useState<string>("");
-  const [isAvailable, setIsAvailable] = useState<boolean>(true);
+  const [confirmPassword, setConfirmPassword] = useState<string>("");
+
+  const [role, setRole] = useState<string>("Consumer");
+  const [bloodGroup, setBloodGroup] = useState<string>("A+");
+  const [address, setAddress] = useState<string>("");
+
+  const [isRoleMenuOpen, setIsRoleMenuOpen] = useState(false);
+  const [isBloodMenuOpen, setIsBloodMenuOpen] = useState(false);
 
   const [loading, setLoading] = useState<boolean>(false);
   const [user, setUser] = useState<{ name?: string; email?: string } | null>(
     null
   );
 
-  // On mount -> attempt to restore session from AsyncStorage
+  const [isAvailable, setIsAvailable] = useState<boolean>(true);
+
   useEffect(() => {
     (async () => {
       try {
@@ -61,9 +82,6 @@ const ProfileScreen: React.FC = () => {
     })();
   }, []);
 
-  // --------------------------
-  // 🔐 LOGIN (Real Backend)
-  // --------------------------
   const handleLogin = async (): Promise<void> => {
     if (!email || !password) {
       Alert.alert("Error", "Please fill all fields");
@@ -75,7 +93,6 @@ const ProfileScreen: React.FC = () => {
       const res = await loginUser({ email, password });
       const { token, user: resUser } = res.data;
 
-      // Persist token and user
       await AsyncStorage.setItem("token", token);
       await AsyncStorage.setItem("user", JSON.stringify(resUser));
 
@@ -86,59 +103,54 @@ const ProfileScreen: React.FC = () => {
 
       Alert.alert("Success", "Logged in successfully");
     } catch (error: any) {
-      const msg = error?.response?.data?.message || error.message || "Login failed";
+      const msg =
+        error?.response?.data?.message || error.message || "Login failed";
       Alert.alert("Login failed", msg);
     } finally {
       setLoading(false);
     }
   };
 
-  // --------------------------
-  // 📝 REGISTER (Real Backend)
-  // --------------------------
   const handleRegister = async (): Promise<void> => {
-    if (!name || !email || !password) {
-      Alert.alert("Error", "Please fill all fields");
+    if (!name || !email || !password || !confirmPassword || !role) {
+      Alert.alert("Error", "Please fill all required fields");
       return;
     }
 
     setLoading(true);
     try {
-      await registerUser({ name, email, password });
+      await registerUser({
+        name,
+        email,
+        password,
+        confirmPassword,
+        role,
+        bloodGroup,
+        address,
+      });
 
-      // After registration, switch to login tab and prefill email
       Alert.alert("Success", "Registration successful — please login");
       setActiveTab("login");
       setPassword("");
+      setConfirmPassword("");
     } catch (error: any) {
       const msg =
-        error?.response?.data?.message || error.message || "Registration failed";
+        error?.response?.data?.message ||
+        error.message ||
+        "Registration failed";
       Alert.alert("Registration failed", msg);
     } finally {
       setLoading(false);
     }
   };
 
-  // --------------------------
-  // 🚪 LOGOUT
-  // --------------------------
   const handleLogout = async (): Promise<void> => {
-    try {
-      await AsyncStorage.removeItem("token");
-      await AsyncStorage.removeItem("user");
-    } catch (err) {
-      console.warn("Error clearing storage:", err);
-    }
+    await AsyncStorage.removeItem("token");
+    await AsyncStorage.removeItem("user");
     setIsLoggedIn(false);
     setUser(null);
-    setEmail("");
-    setPassword("");
-    setName("");
   };
 
-  // ===========================
-  // UI: Logged-in profile view
-  // ===========================
   if (isLoggedIn && user) {
     return (
       <View style={styles.container}>
@@ -150,41 +162,15 @@ const ProfileScreen: React.FC = () => {
           }}
         />
 
-        <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={styles.content}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Profile Header */}
+        <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
           <Card style={styles.profileCard} padding={spacing.lg}>
             <View style={styles.avatarLarge}>
               <Text style={styles.avatarEmojiLarge}>👤</Text>
             </View>
-            <Text style={styles.profileName}>{user.name ?? "Unknown"}</Text>
-            <Text style={styles.profileEmail}>{user.email ?? "—"}</Text>
+            <Text style={styles.profileName}>{user.name}</Text>
+            <Text style={styles.profileEmail}>{user.email}</Text>
           </Card>
 
-          {/* Stats Card (static for now) */}
-          <Card style={styles.statsCard} padding={spacing.base}>
-            <View style={styles.statsRow}>
-              <View style={styles.statItem}>
-                <Text style={styles.statValue}>4.8</Text>
-                <Text style={styles.statLabel}>Rating</Text>
-              </View>
-              <View style={styles.statDivider} />
-              <View style={styles.statItem}>
-                <Text style={styles.statValue}>24</Text>
-                <Text style={styles.statLabel}>Requests</Text>
-              </View>
-              <View style={styles.statDivider} />
-              <View style={styles.statItem}>
-                <Text style={styles.statValue}>৳12k</Text>
-                <Text style={styles.statLabel}>Earnings</Text>
-              </View>
-            </View>
-          </Card>
-
-          {/* Availability Toggle */}
           <Card style={styles.availabilityCard} padding={spacing.base}>
             <View style={styles.availabilityRow}>
               <View>
@@ -203,15 +189,6 @@ const ProfileScreen: React.FC = () => {
           </Card>
 
           <Button
-            title="Edit Profile"
-            onPress={() => console.log("Edit profile")}
-            variant="primary"
-            size="large"
-            fullWidth
-            style={styles.actionButton}
-          />
-
-          <Button
             title="Logout"
             onPress={handleLogout}
             variant="outline"
@@ -223,9 +200,6 @@ const ProfileScreen: React.FC = () => {
     );
   }
 
-  // ===========================
-  // UI: Login / Register Form
-  // ===========================
   return (
     <View style={styles.container}>
       <Header
@@ -236,64 +210,158 @@ const ProfileScreen: React.FC = () => {
         }}
       />
 
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Tabs */}
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
         <View style={styles.tabs}>
           <TouchableOpacity
             style={[styles.tab, activeTab === "login" && styles.tabActive]}
             onPress={() => setActiveTab("login")}
-            activeOpacity={0.7}
           >
-            <Text style={[styles.tabText, activeTab === "login" && styles.tabTextActive]}>
+            <Text
+              style={[
+                styles.tabText,
+                activeTab === "login" && styles.tabTextActive,
+              ]}
+            >
               Login
             </Text>
           </TouchableOpacity>
+
           <TouchableOpacity
             style={[styles.tab, activeTab === "register" && styles.tabActive]}
             onPress={() => setActiveTab("register")}
-            activeOpacity={0.7}
           >
             <Text
-              style={[styles.tabText, activeTab === "register" && styles.tabTextActive]}
+              style={[
+                styles.tabText,
+                activeTab === "register" && styles.tabTextActive,
+              ]}
             >
               Register
             </Text>
           </TouchableOpacity>
         </View>
 
-        {/* Form Card */}
         <Card style={styles.formCard} padding={spacing.lg}>
           {activeTab === "register" && (
-            <Input
-              label="Full Name"
-              placeholder="Enter your name"
-              value={name}
-              onChangeText={setName}
-              icon={<Text style={styles.inputIcon}>👤</Text>}
-            />
+            <>
+              <Input
+                label="Full Name"
+                placeholder="Enter your name"
+                value={name}
+                onChangeText={setName}
+                icon={<Text style={styles.inputIcon}>👤</Text>}
+              />
+
+              <Input
+                label="Email"
+                placeholder="Enter your email"
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                icon={<Text style={styles.inputIcon}>✉️</Text>}
+              />
+
+              <Input
+                label="Password"
+                placeholder="Enter your password"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
+                icon={<Text style={styles.inputIcon}>🔒</Text>}
+              />
+
+              <Input
+                label="Confirm Password"
+                placeholder="Confirm your password"
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+                secureTextEntry
+                icon={<Text style={styles.inputIcon}>🔒</Text>}
+              />
+
+              {/* ROLE DROPDOWN */}
+              <Input
+                label="Role"
+                value={role}
+                editable={false}
+                onPressIn={() => setIsRoleMenuOpen(!isRoleMenuOpen)}
+                icon={<Text style={styles.inputIcon}>👥</Text>}
+              />
+
+              {isRoleMenuOpen && (
+                <View style={styles.dropdownList}>
+                  {ROLES.map((r) => (
+                    <TouchableOpacity
+                      key={r}
+                      onPress={() => {
+                        setRole(r);
+                        setIsRoleMenuOpen(false);
+                      }}
+                    >
+                      <Text style={styles.dropdownItem}>{r}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+
+              {/* BLOOD GROUP DROPDOWN */}
+              <Input
+                label="Blood Group"
+                value={bloodGroup}
+                editable={false}
+                onPressIn={() => setIsBloodMenuOpen(!isBloodMenuOpen)}
+                icon={<Text style={styles.inputIcon}>🩸</Text>}
+              />
+
+              {isBloodMenuOpen && (
+                <View style={styles.dropdownListScroll}>
+                  <ScrollView>
+                    {BLOOD_GROUPS.map((bg) => (
+                      <TouchableOpacity
+                        key={bg}
+                        onPress={() => {
+                          setBloodGroup(bg);
+                          setIsBloodMenuOpen(false);
+                        }}
+                      >
+                        <Text style={styles.dropdownItem}>{bg}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
+
+              <Input
+                label="Address"
+                placeholder="Enter your address"
+                value={address}
+                onChangeText={setAddress}
+                icon={<Text style={styles.inputIcon}>📍</Text>}
+              />
+            </>
           )}
 
-          <Input
-            label="Email"
-            placeholder="Enter your email"
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            icon={<Text style={styles.inputIcon}>✉️</Text>}
-          />
+          {activeTab === "login" && (
+            <>
+              <Input
+                label="Email"
+                placeholder="Enter your email"
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                icon={<Text style={styles.inputIcon}>✉️</Text>}
+              />
 
-          <Input
-            label="Password"
-            placeholder="Enter your password"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-            icon={<Text style={styles.inputIcon}>🔒</Text>}
-          />
+              <Input
+                label="Password"
+                placeholder="Enter your password"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
+                icon={<Text style={styles.inputIcon}>🔒</Text>}
+              />
+            </>
+          )}
 
           <Button
             title={activeTab === "login" ? "Login" : "Register"}
@@ -309,6 +377,10 @@ const ProfileScreen: React.FC = () => {
     </View>
   );
 };
+
+// ---------------------------------------------------------------
+// UPDATED STYLES (Only 3 replaced)
+// ---------------------------------------------------------------
 
 const styles = StyleSheet.create({
   container: {
@@ -344,7 +416,6 @@ const styles = StyleSheet.create({
   },
   tabText: {
     fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.medium,
     color: colors.textSecondary,
   },
   tabTextActive: {
@@ -356,6 +427,47 @@ const styles = StyleSheet.create({
   inputIcon: {
     fontSize: 16,
   },
+
+  // ------------------------------------------------
+  // NEW REPLACED DROPDOWN STYLES (Option C)
+  // ------------------------------------------------
+
+  dropdownList: {
+    backgroundColor: colors.card,
+    borderRadius: borderRadius.base,
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginTop: spacing.xs,
+    paddingVertical: spacing.xs,
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+  },
+
+  dropdownListScroll: {
+    backgroundColor: colors.card,
+    borderRadius: borderRadius.base,
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginTop: spacing.xs,
+    paddingVertical: spacing.xs,
+    maxHeight: 150,
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+  },
+
+  dropdownItem: {
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.base,
+    fontSize: typography.fontSize.base,
+    color: colors.textPrimary,
+  },
+
   profileCard: {
     alignItems: "center",
     marginBottom: spacing.base,
@@ -376,37 +488,10 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize["2xl"],
     fontWeight: typography.fontWeight.bold,
     color: colors.textPrimary,
-    marginBottom: spacing.xs,
   },
   profileEmail: {
     fontSize: typography.fontSize.base,
     color: colors.textSecondary,
-  },
-  statsCard: {
-    marginBottom: spacing.base,
-  },
-  statsRow: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  statItem: {
-    flex: 1,
-    alignItems: "center",
-  },
-  statValue: {
-    fontSize: typography.fontSize["3xl"],
-    fontWeight: typography.fontWeight.bold,
-    color: colors.primary,
-    marginBottom: spacing.xs,
-  },
-  statLabel: {
-    fontSize: typography.fontSize.sm,
-    color: colors.textSecondary,
-  },
-  statDivider: {
-    width: 1,
-    height: 40,
-    backgroundColor: colors.border,
   },
   availabilityCard: {
     marginBottom: spacing.base,
@@ -418,16 +503,12 @@ const styles = StyleSheet.create({
   },
   availabilityTitle: {
     fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.semibold,
+    fontWeight: "600",
     color: colors.textPrimary,
-    marginBottom: spacing.xs,
   },
   availabilitySubtitle: {
     fontSize: typography.fontSize.sm,
     color: colors.textSecondary,
-  },
-  actionButton: {
-    marginBottom: spacing.base,
   },
 });
 

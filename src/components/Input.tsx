@@ -7,6 +7,7 @@ import {
   ViewStyle,
   TextStyle,
   KeyboardTypeOptions,
+  TouchableOpacity,
 } from 'react-native';
 import { colors, typography, spacing, borderRadius } from '../theme/theme';
 
@@ -14,7 +15,7 @@ export interface InputProps {
   label?: string;
   placeholder?: string;
   value: string;
-  onChangeText: (text: string) => void;
+  onChangeText?: (text: string) => void;
   icon?: React.ReactNode;
   error?: string;
   secureTextEntry?: boolean;
@@ -23,12 +24,11 @@ export interface InputProps {
   numberOfLines?: number;
   style?: ViewStyle;
   inputStyle?: TextStyle;
+
+  editable?: boolean;
+  onPressIn?: () => void;
 }
 
-/**
- * Input Component
- * Reusable text input with label, icon, and error support
- */
 const Input: React.FC<InputProps> = ({
   label,
   placeholder,
@@ -42,32 +42,42 @@ const Input: React.FC<InputProps> = ({
   numberOfLines = 1,
   style,
   inputStyle,
+  editable = true,
+  onPressIn,
 }) => {
   return (
     <View style={[styles.container, style]}>
       {label && <Text style={styles.label}>{label}</Text>}
 
-      <View style={[styles.inputWrapper, error && styles.inputWrapperError]}>
-        {icon && <View style={styles.iconContainer}>{icon}</View>}
+      <TouchableOpacity
+        activeOpacity={1}
+        onPressIn={onPressIn}
+        disabled={editable}
+      >
+        <View style={[styles.inputWrapper, error && styles.inputWrapperError]}>
+          {icon && <View style={styles.iconContainer}>{icon}</View>}
 
-        <TextInput
-          style={[
-            styles.input,
-            icon ? { paddingLeft: spacing.base } : null,
-            multiline && styles.inputMultiline,
-            inputStyle,
-          ]}
-          placeholder={placeholder}
-          placeholderTextColor={colors.textTertiary}
-          value={value}
-          onChangeText={onChangeText}
-          secureTextEntry={secureTextEntry}
-          keyboardType={keyboardType}
-          multiline={multiline}
-          numberOfLines={numberOfLines}
-          textAlignVertical={multiline ? 'top' : 'center'}
-        />
-      </View>
+          <TextInput
+            style={[
+              styles.input,
+              icon ? { paddingLeft: spacing.base } : null,
+              multiline && styles.inputMultiline,
+              inputStyle,
+            ]}
+            placeholder={placeholder}
+            placeholderTextColor={colors.textTertiary}
+            value={value}
+            onChangeText={onChangeText}
+            secureTextEntry={secureTextEntry}
+            keyboardType={keyboardType}
+            multiline={multiline}
+            numberOfLines={numberOfLines}
+            textAlignVertical={multiline ? 'top' : 'center'}
+            editable={editable}
+            pointerEvents={editable ? 'auto' : 'none'}
+          />
+        </View>
+      </TouchableOpacity>
 
       {error && <Text style={styles.errorText}>{error}</Text>}
     </View>
@@ -104,9 +114,6 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.base,
     color: colors.textPrimary,
     paddingVertical: spacing.md,
-  },
-  inputWithIcon: {
-    paddingLeft: 0,
   },
   inputMultiline: {
     minHeight: 100,
