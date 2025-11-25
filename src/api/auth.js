@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const API_BASE = "http://192.168.1.22:5000";
+const API_BASE = "http://192.168.1.16:5000";
 // Use your PC's IPv4 address for physical device testing
 // const API_BASE = "http://192.168.1.22:5000";
 // For Android emulator use 10.0.2.2
