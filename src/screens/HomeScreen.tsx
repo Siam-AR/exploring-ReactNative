@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal } from 'react-native';
 import { colors, typography, spacing, borderRadius, shadows, layout } from '../theme/theme';
 import { HomeScreenProps } from '../types/navigation';
+import { getStats } from '../api/auth'; // <-- Added import
 
 /**
  * HomeScreen
@@ -11,11 +12,29 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const [showMenu, setShowMenu] = useState<boolean>(false);
   const [showAbout, setShowAbout] = useState<boolean>(false);
 
+  // Stats state
+  const [stats, setStats] = useState({ helpers: 0, consumers: 0 });
+  const [loadingStats, setLoadingStats] = useState(true);
+
+  // Fetch stats on mount
+  useEffect(() => {
+    (async () => {
+      try {
+        const data = await getStats();
+        setStats(data);
+      } catch (err) {
+        console.log("Stats fetch failed:", err);
+      } finally {
+        setLoadingStats(false);
+      }
+    })();
+  }, []);
+
   return (
     <View style={styles.container}>
       {/* Header with Menu */}
       <View style={styles.header}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.menuButton}
           onPress={() => setShowMenu(true)}
           activeOpacity={0.7}
@@ -24,8 +43,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         </TouchableOpacity>
       </View>
 
-      <ScrollView 
-        style={styles.scrollView} 
+      <ScrollView
+        style={styles.scrollView}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
@@ -78,12 +97,17 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         {/* Community Stats */}
         <View style={styles.stats}>
           <View style={[styles.statCard, styles.statCardPrimary]}>
-            <Text style={styles.statNumber}>250+</Text>
-            <Text style={styles.statLabel}>Active Helpers</Text>
+            <Text style={styles.statNumber}>
+              {loadingStats ? "…" : stats.helpers}
+            </Text>
+            <Text style={styles.statLabel}>Total Helpers</Text>
           </View>
+
           <View style={[styles.statCard, styles.statCardSecondary]}>
-            <Text style={styles.statNumber}>1,000+</Text>
-            <Text style={styles.statLabel}>People Helped</Text>
+            <Text style={styles.statNumber}>
+              {loadingStats ? "…" : stats.consumers}
+            </Text>
+            <Text style={styles.statLabel}>Total Consumers</Text>
           </View>
         </View>
       </ScrollView>
@@ -95,13 +119,13 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         animationType="fade"
         onRequestClose={() => setShowMenu(false)}
       >
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.modalOverlay}
           activeOpacity={1}
           onPress={() => setShowMenu(false)}
         >
           <View style={styles.menuModal}>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.menuItem}
               onPress={() => {
                 setShowMenu(false);
@@ -111,8 +135,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
               <Text style={styles.menuItemIcon}>🌙</Text>
               <Text style={styles.menuItemText}>Toggle Theme</Text>
             </TouchableOpacity>
-            
-            <TouchableOpacity 
+
+            <TouchableOpacity
               style={styles.menuItem}
               onPress={() => {
                 setShowMenu(false);
@@ -122,8 +146,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
               <Text style={styles.menuItemIcon}>ℹ️</Text>
               <Text style={styles.menuItemText}>About</Text>
             </TouchableOpacity>
-            
-            <TouchableOpacity 
+
+            <TouchableOpacity
               style={styles.menuItem}
               onPress={() => {
                 setShowMenu(false);
@@ -274,13 +298,16 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.md,
     padding: spacing.lg,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: "#ffffff22",
   },
   statCardPrimary: {
-    backgroundColor: colors.primary,
+    backgroundColor: "#234C6A", 
   },
   statCardSecondary: {
-    backgroundColor: colors.accent,
+    backgroundColor: "#234C6A", 
   },
+
   statNumber: {
     fontSize: typography.fontSize['5xl'],
     fontWeight: typography.fontWeight.bold,

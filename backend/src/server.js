@@ -3,6 +3,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 import connectDB from "./config/db.js";
 import userRoutes from "./routes/userRoutes.js";
+import statsRoutes from "./routes/statsRoutes.js";
 
 dotenv.config();
 
@@ -14,6 +15,7 @@ app.use(cors());
 app.use(express.json());
 
 app.use("/api/users", userRoutes);
+app.use("/api/stats", statsRoutes);
 
 app.get("/", (req, res) => {
   res.send("API running...");
