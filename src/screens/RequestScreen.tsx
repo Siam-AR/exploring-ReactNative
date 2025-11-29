@@ -1,12 +1,27 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import Header from '../components/Header';
-import Input from '../components/Input';
-import Button from '../components/Button';
-import EmergencyCard, { EmergencyStatus } from '../components/EmergencyCard';
-import Card from '../components/Card';
-import { colors, typography, spacing, borderRadius, layout } from '../theme/theme';
+import React, { useState, useEffect } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  Alert,
+} from "react-native";
+import { useNavigation } from "@react-navigation/native";
+import Header from "../components/Header";
+import Input from "../components/Input";
+import Button from "../components/Button";
+import EmergencyCard from "../components/EmergencyCard";
+import Card from "../components/Card";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { createRequest, getRequests } from "../api/request";
+import {
+  colors,
+  typography,
+  spacing,
+  borderRadius,
+  layout,
+} from "../theme/theme";
 
 interface Service {
   id: string;
@@ -14,74 +29,81 @@ interface Service {
   emoji: string;
 }
 
-interface EmergencyRequest {
-  id: string;
-  title: string;
-  description: string;
-  location: string;
-  timeAgo: string;
-  status: EmergencyStatus;
-}
-
-/**
- * RequestScreen
- * Post emergency service requests and view active requests
- */
 const RequestScreen: React.FC = () => {
   const navigation = useNavigation();
-  const [selectedService, setSelectedService] = useState<string>('');
-  const [description, setDescription] = useState<string>('');
-  const [location, setLocation] = useState<string>('');
+
+  const [selectedService, setSelectedService] = useState("");
+  const [description, setDescription] = useState("");
+  const [location, setLocation] = useState("");
+
+  const [requests, setRequests] = useState([]);
+  const [loading, setLoading] = useState(false);
 
   const services: Service[] = [
-    { id: '1', name: 'Doctor', emoji: '👨‍⚕️' },
-    { id: '2', name: 'Plumber', emoji: '🔧' },
-    { id: '3', name: 'Electrician', emoji: '⚡' },
-    { id: '4', name: 'Mechanic', emoji: '🔩' },
+    { id: "1", name: "Doctor", emoji: "👨‍⚕️" },
+    { id: "2", name: "Plumber", emoji: "🔧" },
+    { id: "3", name: "Electrician", emoji: "⚡" },
+    { id: "4", name: "Mechanic", emoji: "🔩" },
   ];
 
-  const emergencyRequests: EmergencyRequest[] = [
-    {
-      id: '1',
-      title: 'Urgent Plumber Needed',
-      description: 'Water pipe burst in kitchen, need immediate help',
-      location: 'Dhaka, Gulshan-2',
-      timeAgo: '5 min ago',
-      status: 'active',
-    },
-    {
-      id: '2',
-      title: 'Electrician Required',
-      description: 'Power outage in entire building, fuse box issue',
-      location: 'Dhaka, Dhanmondi',
-      timeAgo: '15 min ago',
-      status: 'pending',
-    },
-    {
-      id: '3',
-      title: 'Doctor Emergency',
-      description: 'Need home visit for elderly patient with fever',
-      location: 'Dhaka, Mirpur-10',
-      timeAgo: '30 min ago',
-      status: 'resolved',
-    },
-  ];
+  // Fetch Requests From Backend
+  const fetchRequests = async () => {
+    try {
+      const token = await AsyncStorage.getItem("token");
+      if (!token) return;
 
-  const handlePostRequest = (): void => {
+      const data = await getRequests(token);
+      setRequests(data);
+    } catch (err: any) {
+      console.log("GET REQUEST ERROR:", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchRequests();
+  }, []);
+
+  // Post Emergency Request
+  const handlePostRequest = async () => {
     if (!selectedService || !description || !location) {
-      Alert.alert('Error', 'Please fill all fields');
+      Alert.alert("Error", "Please fill all fields");
       return;
     }
-    console.log('Posting request:', { selectedService, description, location });
-    // Clear form
-    setSelectedService('');
-    setDescription('');
-    setLocation('');
+
+    try {
+      setLoading(true);
+      const token = await AsyncStorage.getItem("token");
+      if (!token) {
+        Alert.alert("Error", "User not logged in");
+        return;
+      }
+
+      await createRequest(token, {
+        serviceType: selectedService,
+        description,
+        location,
+      });
+
+      Alert.alert("Success", "Request Posted Successfully!");
+
+      // Clear fields
+      setSelectedService("");
+      setDescription("");
+      setLocation("");
+
+      // Refresh list
+      fetchRequests();
+    } catch (err: any) {
+      Alert.alert("Error", err.message || "Something went wrong");
+      console.log("POST REQUEST ERROR:", err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <View style={styles.container}>
-      <Header 
+      <Header
         title="Emergency Requests"
         leftAction={{
           icon: <Text style={styles.backIcon}>←</Text>,
@@ -89,19 +111,19 @@ const RequestScreen: React.FC = () => {
         }}
       />
 
-      <ScrollView 
+      <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        {/* Post Request Form */}
+        {/* Post Request Card */}
         <Card style={styles.formCard} padding={spacing.base}>
           <View style={styles.formHeader}>
             <Text style={styles.formEmoji}>🚨</Text>
             <Text style={styles.formTitle}>Post Emergency Request</Text>
           </View>
 
-          {/* Service Type Chips */}
+          {/* Service Type Selector */}
           <Text style={styles.label}>Service Type</Text>
           <View style={styles.chipsContainer}>
             {services.map((service) => (
@@ -112,7 +134,6 @@ const RequestScreen: React.FC = () => {
                   selectedService === service.name && styles.chipActive,
                 ]}
                 onPress={() => setSelectedService(service.name)}
-                activeOpacity={0.7}
               >
                 <Text style={styles.chipEmoji}>{service.emoji}</Text>
                 <Text
@@ -127,7 +148,7 @@ const RequestScreen: React.FC = () => {
             ))}
           </View>
 
-          {/* Description Input */}
+          {/* Description */}
           <Input
             label="Description"
             placeholder="Describe your emergency..."
@@ -137,7 +158,7 @@ const RequestScreen: React.FC = () => {
             numberOfLines={4}
           />
 
-          {/* Location Input */}
+          {/* Location */}
           <Input
             label="Location"
             placeholder="Enter your location"
@@ -146,9 +167,9 @@ const RequestScreen: React.FC = () => {
             icon={<Text style={styles.inputIcon}>📍</Text>}
           />
 
-          {/* Post Button */}
+          {/* Submit Button */}
           <Button
-            title="Post Request"
+            title={loading ? "Posting..." : "Post Request"}
             onPress={handlePostRequest}
             variant="danger"
             size="large"
@@ -159,24 +180,26 @@ const RequestScreen: React.FC = () => {
         {/* Active Requests Section */}
         <View style={styles.requestsSection}>
           <Text style={styles.requestsTitle}>Active Requests</Text>
-          <Text style={styles.requestsCount}>{emergencyRequests.length} requests</Text>
+          <Text style={styles.requestsCount}>{requests.length} requests</Text>
         </View>
 
-        {/* Emergency Cards */}
-        {emergencyRequests.map((request) => (
+        {/* Render Requests */}
+        {requests.map((req: any) => (
           <EmergencyCard
-            key={request.id}
-            title={request.title}
-            description={request.description}
-            location={request.location}
-            timeAgo={request.timeAgo}
-            status={request.status}
+            key={req._id}
+            title={`${req.serviceType} Needed`}
+            description={req.description}
+            location={req.location}
+            timeAgo={new Date(req.createdAt).toLocaleTimeString()}
+            status={req.status}
           />
         ))}
       </ScrollView>
     </View>
   );
 };
+
+export default RequestScreen;
 
 const styles = StyleSheet.create({
   container: {
@@ -200,8 +223,8 @@ const styles = StyleSheet.create({
     borderLeftColor: colors.accent,
   },
   formHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: spacing.base,
   },
   formEmoji: {
@@ -220,14 +243,14 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   chipsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: spacing.sm,
     marginBottom: spacing.base,
   },
   chip: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
     borderRadius: borderRadius.sm,
@@ -255,9 +278,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   requestsSection: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: spacing.base,
   },
   requestsTitle: {
@@ -270,5 +293,3 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
 });
-
-export default RequestScreen;
