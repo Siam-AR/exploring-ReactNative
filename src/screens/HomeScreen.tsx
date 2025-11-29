@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, RefreshControl } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { colors, typography, spacing, borderRadius, shadows, layout } from '../theme/theme';
 import { HomeScreenProps } from '../types/navigation';
 import { getStats } from '../api/auth'; // <-- Added import
@@ -16,19 +17,46 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const [stats, setStats] = useState({ helpers: 0, consumers: 0 });
   const [loadingStats, setLoadingStats] = useState(true);
 
+  // Refresh state
+  const [refreshing, setRefreshing] = useState(false);
+
   // Fetch stats on mount
   useEffect(() => {
-    (async () => {
-      try {
-        const data = await getStats();
-        setStats(data);
-      } catch (err) {
-        console.log("Stats fetch failed:", err);
-      } finally {
-        setLoadingStats(false);
-      }
-    })();
+    fetchStats();
   }, []);
+
+  // Refresh when screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchStats();
+    }, [])
+  );
+
+  // Fetch stats function
+  const fetchStats = async () => {
+    setLoadingStats(true);
+    try {
+      const data = await getStats();
+      setStats(data);
+    } catch (err) {
+      console.log("Stats fetch failed:", err);
+    } finally {
+      setLoadingStats(false);
+    }
+  };
+
+  // Pull-to-refresh handler
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      const data = await getStats();
+      setStats(data);
+    } catch (e) {
+      console.log("Refresh error:", e);
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -47,6 +75,9 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         style={styles.scrollView}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+        }
       >
         {/* Hero Section */}
         <View style={styles.hero}>
