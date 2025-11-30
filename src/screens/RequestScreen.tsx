@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -6,8 +6,9 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
+  ActivityIndicator,
 } from "react-native";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import Header from "../components/Header";
 import Input from "../components/Input";
 import Button from "../components/Button";
@@ -36,34 +37,42 @@ const RequestScreen: React.FC = () => {
   const [description, setDescription] = useState("");
   const [location, setLocation] = useState("");
 
-  const [requests, setRequests] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [requests, setRequests] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [posting, setPosting] = useState(false);
 
   const services: Service[] = [
     { id: "1", name: "Doctor", emoji: "👨‍⚕️" },
     { id: "2", name: "Plumber", emoji: "🔧" },
     { id: "3", name: "Electrician", emoji: "⚡" },
     { id: "4", name: "Mechanic", emoji: "🔩" },
+    { id: "5", name: "Blood Donor", emoji: "🩸" },
   ];
 
   // Fetch Requests From Backend
   const fetchRequests = async () => {
     try {
+      setLoading(true);
       const token = await AsyncStorage.getItem("token");
       if (!token) return;
 
       const data = await getRequests(token);
-      setRequests(data);
+      setRequests(Array.isArray(data) ? data : []);
     } catch (err: any) {
       console.log("GET REQUEST ERROR:", err);
+    } finally {
+      setLoading(false);
     }
   };
 
-  useEffect(() => {
-    fetchRequests();
-  }, []);
+  // AUTO REFRESH WHEN SCREEN FOCUSES
+  useFocusEffect(
+    useCallback(() => {
+      fetchRequests();
+    }, [])
+  );
 
-  // Post Emergency Request
+  // Submit New Request
   const handlePostRequest = async () => {
     if (!selectedService || !description || !location) {
       Alert.alert("Error", "Please fill all fields");
@@ -71,7 +80,7 @@ const RequestScreen: React.FC = () => {
     }
 
     try {
-      setLoading(true);
+      setPosting(true);
       const token = await AsyncStorage.getItem("token");
       if (!token) {
         Alert.alert("Error", "User not logged in");
@@ -95,9 +104,8 @@ const RequestScreen: React.FC = () => {
       fetchRequests();
     } catch (err: any) {
       Alert.alert("Error", err.message || "Something went wrong");
-      console.log("POST REQUEST ERROR:", err);
     } finally {
-      setLoading(false);
+      setPosting(false);
     }
   };
 
@@ -123,7 +131,7 @@ const RequestScreen: React.FC = () => {
             <Text style={styles.formTitle}>Post Emergency Request</Text>
           </View>
 
-          {/* Service Type Selector */}
+          {/* Services */}
           <Text style={styles.label}>Service Type</Text>
           <View style={styles.chipsContainer}>
             {services.map((service) => (
@@ -148,7 +156,6 @@ const RequestScreen: React.FC = () => {
             ))}
           </View>
 
-          {/* Description */}
           <Input
             label="Description"
             placeholder="Describe your emergency..."
@@ -158,7 +165,6 @@ const RequestScreen: React.FC = () => {
             numberOfLines={4}
           />
 
-          {/* Location */}
           <Input
             label="Location"
             placeholder="Enter your location"
@@ -167,9 +173,8 @@ const RequestScreen: React.FC = () => {
             icon={<Text style={styles.inputIcon}>📍</Text>}
           />
 
-          {/* Submit Button */}
           <Button
-            title={loading ? "Posting..." : "Post Request"}
+            title={posting ? "Posting..." : "Post Request"}
             onPress={handlePostRequest}
             variant="danger"
             size="large"
@@ -177,11 +182,23 @@ const RequestScreen: React.FC = () => {
           />
         </Card>
 
-        {/* Active Requests Section */}
+        {/* Active Requests */}
         <View style={styles.requestsSection}>
           <Text style={styles.requestsTitle}>Active Requests</Text>
           <Text style={styles.requestsCount}>{requests.length} requests</Text>
         </View>
+
+        {/* Loader */}
+        {loading && (
+          <ActivityIndicator size="large" color={colors.primary} />
+        )}
+
+        {/* No Requests */}
+        {!loading && requests.length === 0 && (
+          <Text style={{ color: colors.textSecondary, textAlign: "center", marginTop: 20 }}>
+            No active requests found.
+          </Text>
+        )}
 
         {/* Render Requests */}
         {requests.map((req: any) => (

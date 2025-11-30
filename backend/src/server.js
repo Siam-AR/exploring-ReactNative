@@ -5,6 +5,8 @@ import connectDB from "./config/db.js";
 import userRoutes from "./routes/userRoutes.js";
 import statsRoutes from "./routes/statsRoutes.js";
 import requestRoutes from "./routes/requestRoutes.js";
+import helperRoutes from "./routes/helperRoutes.js";
+
 
 dotenv.config();
 connectDB();
@@ -17,6 +19,8 @@ app.use(express.json());
 app.use("/api/users", userRoutes);
 app.use("/api/stats", statsRoutes);
 app.use("/api/requests", requestRoutes);
+app.use("/api/helpers", helperRoutes);
+
 
 app.get("/", (req, res) => res.send("API running..."));
 

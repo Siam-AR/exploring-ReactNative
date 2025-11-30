@@ -1,14 +1,17 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+
 import Header from '../components/Header';
 import Input from '../components/Input';
 import Button from '../components/Button';
 import HelperCard from '../components/HelperCard';
 import Card from '../components/Card';
+
 import { colors, typography, spacing, borderRadius, layout } from '../theme/theme';
-import { RootStackParamList, Helper } from '../types/navigation';
+import { RootStackParamList } from '../types/navigation';
+import { getHelpers } from '../api/helpers';
 
 interface Service {
   id: string;
@@ -18,14 +21,14 @@ interface Service {
 
 type SearchScreenNavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
-/**
- * SearchScreen
- * Search and filter helpers by service type and location
- */
 const SearchScreen: React.FC = () => {
   const navigation = useNavigation<SearchScreenNavigationProp>();
+
   const [selectedService, setSelectedService] = useState<string>('');
   const [location, setLocation] = useState<string>('');
+  const [helpers, setHelpers] = useState<any[]>([]);
+  const [filteredHelpers, setFilteredHelpers] = useState<any[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
 
   const services: Service[] = [
     { id: '1', name: 'Tutor', emoji: '📚' },
@@ -36,48 +39,45 @@ const SearchScreen: React.FC = () => {
     { id: '6', name: 'Mechanic', emoji: '🔩' },
   ];
 
-  const helpers: Helper[] = [
-    {
-      id: '1',
-      name: 'Ahmed Rahman',
-      service: 'Tutor',
-      location: 'Dhaka, Gulshan',
-      rating: 4.8,
-      hourlyRate: '৳500',
-    },
-    {
-      id: '2',
-      name: 'Dr. Fatima Khan',
-      service: 'Doctor',
-      location: 'Dhaka, Dhanmondi',
-      rating: 4.9,
-      hourlyRate: '৳1000',
-    },
-    {
-      id: '3',
-      name: 'Karim Hossain',
-      service: 'Plumber',
-      location: 'Dhaka, Mirpur',
-      rating: 4.5,
-      hourlyRate: '৳400',
-    },
-    {
-      id: '4',
-      name: 'Rashid Ali',
-      service: 'Electrician',
-      location: 'Dhaka, Banani',
-      rating: 4.7,
-      hourlyRate: '৳600',
-    },
-  ];
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const data = await getHelpers();
+        const arr = Array.isArray(data) ? data : [];
+        setHelpers(arr);
+        setFilteredHelpers(arr);
+      } catch (err) {
+        console.error("Helpers Fetch Error:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  const handleSearch = (): void => {
-    console.log('Searching for:', selectedService, 'in', location);
+    fetchData();
+  }, []);
+
+  const handleSearch = () => {
+    let results = helpers;
+
+    if (selectedService) {
+      results = results.filter((h: any) =>
+        (h?.service || '').toLowerCase() === selectedService.toLowerCase()
+      );
+    }
+
+    if (location) {
+      results = results.filter((h: any) =>
+        (h?.address || '').toLowerCase().includes(location.toLowerCase())
+      );
+    }
+
+    setFilteredHelpers(results);
   };
 
   return (
     <View style={styles.container}>
-      <Header 
+      <Header
         title="Find Helpers"
         leftAction={{
           icon: <Text style={styles.backIcon}>←</Text>,
@@ -85,16 +85,16 @@ const SearchScreen: React.FC = () => {
         }}
       />
 
-      <ScrollView 
+      <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        {/* Filters Card */}
+        {/* Filter Section */}
         <Card style={styles.filterCard} padding={spacing.base}>
           <Text style={styles.sectionTitle}>Select Service</Text>
-          
-          {/* Service Type Chips */}
+
+          {/* Chips */}
           <View style={styles.chipsContainer}>
             {services.map((service) => (
               <TouchableOpacity
@@ -104,7 +104,6 @@ const SearchScreen: React.FC = () => {
                   selectedService === service.name && styles.chipActive,
                 ]}
                 onPress={() => setSelectedService(service.name)}
-                activeOpacity={0.7}
               >
                 <Text style={styles.chipEmoji}>{service.emoji}</Text>
                 <Text
@@ -119,16 +118,14 @@ const SearchScreen: React.FC = () => {
             ))}
           </View>
 
-          {/* Location Input */}
           <Input
             label="Location"
-            placeholder="Enter your area (e.g., Dhaka, Gulshan)"
+            placeholder="Enter your area"
             value={location}
             onChangeText={setLocation}
             icon={<Text style={styles.inputIcon}>📍</Text>}
           />
 
-          {/* Search Button */}
           <Button
             title="Search Helpers"
             onPress={handleSearch}
@@ -138,60 +135,64 @@ const SearchScreen: React.FC = () => {
           />
         </Card>
 
-        {/* Results Section */}
+        {/* Results */}
         <View style={styles.resultsSection}>
           <Text style={styles.resultsTitle}>Available Helpers</Text>
-          <Text style={styles.resultsCount}>{helpers.length} helpers found</Text>
+          <Text style={styles.resultsCount}>{filteredHelpers.length} found</Text>
         </View>
 
-        {/* Helper Cards */}
-        {helpers.map((helper) => (
-          <HelperCard
-            key={helper.id}
-            name={helper.name}
-            service={helper.service}
-            location={helper.location}
-            rating={helper.rating}
-            hourlyRate={helper.hourlyRate}
-            onPress={() => navigation.navigate('HelperDetail', { helper })}
-          />
-        ))}
+        {loading ? (
+          <ActivityIndicator size="large" color={colors.primary} />
+        ) : (
+          filteredHelpers.map((helper) => {
+            const key = helper?._id ?? helper?.id ?? `${Math.random()}`;
+            const name = helper?.name ?? 'Unknown';
+            const service = helper?.service ?? 'Unknown';
+            const address = helper?.address ?? helper?.location ?? 'Unknown';
+
+            return (
+              <HelperCard
+                key={key}
+                name={name}
+                service={service}
+                location={address}
+                onPress={() =>
+                  navigation.navigate('HelperDetail', { helper })
+                }
+              />
+            );
+          })
+        )}
       </ScrollView>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  scrollView: {
-    flex: 1,
-  },
+  container: { flex: 1, backgroundColor: colors.background },
+  scrollView: { flex: 1 },
   content: {
     padding: spacing.base,
     paddingBottom: layout.bottomNavHeight + spacing.base,
   },
-  backIcon: {
-    fontSize: 24,
-    color: colors.textPrimary,
-  },
-  filterCard: {
-    marginBottom: spacing.xl,
-  },
+  backIcon: { fontSize: 24, color: colors.textPrimary },
+
+  filterCard: { marginBottom: spacing.xl },
+
   sectionTitle: {
     fontSize: typography.fontSize.lg,
     fontWeight: typography.fontWeight.semibold,
     color: colors.textPrimary,
     marginBottom: spacing.md,
   },
+
   chipsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.sm,
     marginBottom: spacing.base,
   },
+
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -202,36 +203,37 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
+
   chipActive: {
     backgroundColor: colors.primary,
     borderColor: colors.primary,
   },
-  chipEmoji: {
-    fontSize: 16,
-    marginRight: spacing.xs,
-  },
+
+  chipEmoji: { fontSize: 16, marginRight: spacing.xs },
+
   chipText: {
     fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.medium,
     color: colors.textSecondary,
   },
-  chipTextActive: {
-    color: colors.textWhite,
-  },
-  inputIcon: {
-    fontSize: 16,
-  },
+
+  chipTextActive: { color: colors.textWhite },
+
+  inputIcon: { fontSize: 16 },
+
   resultsSection: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: spacing.base,
   },
+
   resultsTitle: {
     fontSize: typography.fontSize.xl,
     fontWeight: typography.fontWeight.semibold,
     color: colors.textPrimary,
   },
+
   resultsCount: {
     fontSize: typography.fontSize.sm,
     color: colors.textSecondary,

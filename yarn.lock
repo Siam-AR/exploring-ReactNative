@@ -1743,9 +1743,9 @@
     nullthrows "^1.1.1"
 
 "@react-navigation/bottom-tabs@^7.8.5":
-  version "7.8.7"
-  resolved "https://registry.yarnpkg.com/@react-navigation/bottom-tabs/-/bottom-tabs-7.8.7.tgz#0fae8a551e342e9efb4e6689944a1c0199fd7068"
-  integrity sha512-OKdUCJ/nA6CPOO3ruxZTKphH8U9b3zr21ibrsiqM3Sr72tJ5fAPNbI+3zh2mENVRnRxQbUNHh016ruJ65nl0JQ==
+  version "7.8.8"
+  resolved "https://registry.yarnpkg.com/@react-navigation/bottom-tabs/-/bottom-tabs-7.8.8.tgz#dfae549b78152157b6dba7061848c4f31741a6db"
+  integrity sha512-WS84QCOEdARICYnpu4OSIOeCNsWuWuHi+WO1FUw2rBwKZnrmTT6g+Mv3wL+YqtnRGv5FuLexysVgOFouHrJCpQ==
   dependencies:
     "@react-navigation/elements" "^2.8.4"
     color "^4.2.3"
@@ -1775,9 +1775,9 @@
     use-sync-external-store "^1.5.0"
 
 "@react-navigation/native-stack@^7.6.4":
-  version "7.8.1"
-  resolved "https://registry.yarnpkg.com/@react-navigation/native-stack/-/native-stack-7.8.1.tgz#ac1bce9d125d131393197ef36ab355c6ef8de6b7"
-  integrity sha512-76dqsWJiDzw+H6ZZJXNS32j9hYjm+J+bkV+vtribaWv5Ky0VUX1K0jGT7Z4EKiHqS7dVsqGHTnUXwwqA/xj1gg==
+  version "7.8.2"
+  resolved "https://registry.yarnpkg.com/@react-navigation/native-stack/-/native-stack-7.8.2.tgz#85bc667947d6a6325ba16b4ec1315a43b1ead4de"
+  integrity sha512-98Kp9A80/1KM9BdDdxuheaPd2tMoASeuUpKOiD9+ST6Zdgnf6B2OuGlmITH/db1IOb7DIfn6bXVWOC3X2CMePA==
   dependencies:
     "@react-navigation/elements" "^2.8.4"
     color "^4.2.3"
