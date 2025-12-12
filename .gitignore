@@ -1,9 +1,7 @@
 # OSX
-#
 .DS_Store
 
 # Xcode
-#
 build/
 *.pbxuser
 !default.pbxuser
@@ -22,8 +20,7 @@ DerivedData
 *.xcuserstate
 **/.xcode.env.local
 
-# Android/IntelliJ
-#
+# Android / IntelliJ
 build/
 .idea
 .gradle
@@ -35,19 +32,19 @@ local.properties
 !debug.keystore
 .kotlin/
 
-# node.js
-#
+# Node.js
 node_modules/
-npm-debug.log
-yarn-error.log
+npm-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
 
-# fastlane
-#
-# It is recommended to not store the screenshots in the git repo. Instead, use fastlane to re-generate the
-# screenshots whenever they are needed.
-# For more information about the recommended setup visit:
-# https://docs.fastlane.tools/best-practices/source-control/
+# Backend generated files
+backend/node_modules/
+backend/package-lock.json
+backend/yarn.lock
 
+# Fastlane
 **/fastlane/report.xml
 **/fastlane/Preview.html
 **/fastlane/screenshots
@@ -58,18 +55,34 @@ yarn-error.log
 
 # Ruby / CocoaPods
 **/Pods/
-/vendor/bundle/
+vendor/bundle/
 
-# Temporary files created by Metro to check the health of the file watcher
+# Metro / React Native temporary files
 .metro-health-check*
+.expo/
+.expo-shared/
+.expo/cache/
+.expo/web-build/
 
-# testing
-/coverage
+# Testing
+coverage/
+jest.config.js
 
-# Yarn
-.yarn/*
-!.yarn/patches
-!.yarn/plugins
-!.yarn/releases
-!.yarn/sdks
-!.yarn/versions
+# Environment files
+.env
+.env.local
+.env.development
+.env.production
+.env.test
+
+# VSCode settings
+.vscode/
+
+# Copilot context file
+copilot-context.ts
+copilot-context.md
+
+# Misc temporary files
+*.swp
+*.tmp
+*.log

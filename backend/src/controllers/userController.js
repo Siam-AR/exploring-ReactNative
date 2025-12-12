@@ -59,9 +59,13 @@ export const registerUser = async (req, res) => {
       return res.status(400).json({ message: "Invalid role" });
     }
 
-    res.json({ message: `${role} created successfully` });
+    console.log("✅ User registered:", { email, role });
+    res.json({ 
+      message: `${role} registered successfully`,
+      user: { name: user.name, email: user.email, role }
+    });
   } catch (err) {
-    console.error("Register Error:", err);
+    console.error("❌ Register Error:", err);
     res.status(500).json({ message: "Server error" });
   }
 };
@@ -70,26 +74,67 @@ export const loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // Try finding user in both collections
-    let user =
-      (await Helper.findOne({ email })) ||
-      (await Consumer.findOne({ email }));
+    console.log("🔐 === LOGIN ATTEMPT ===");
+    console.log("📧 Email from request:", email);
+    console.log("🔑 Password received:", password ? "YES (length: " + password.length + ")" : "NO");
+    console.log("📦 Request body:", JSON.stringify(req.body));
 
-    if (!user) return res.status(400).json({ message: "Invalid email" });
+    if (!email || !password) {
+      console.log("❌ Missing email or password");
+      return res.status(400).json({ message: "Email and password required" });
+    }
+
+    // Try finding user in both collections
+    let user = await Helper.findOne({ email });
+    let role = "Helper";
+    
+    if (!user) {
+      user = await Consumer.findOne({ email });
+      role = "Consumer";
+    }
+
+    if (!user) {
+      console.log("❌ User not found:", email);
+      return res.status(400).json({ message: "Invalid credentials" });
+    }
+
+    console.log("✅ User found:", email, "| Role:", role);
+    console.log("🔑 Stored password hash:", user.password ? user.password.substring(0, 20) + "..." : "NO PASSWORD");
+
+    // Check if password field exists in database
+    if (!user.password) {
+      console.error("❌ CRITICAL: User password field is missing in database for:", email);
+      return res.status(500).json({ message: "Account data corrupted. Please contact support." });
+    }
 
     const valid = await bcrypt.compare(password, user.password);
-    if (!valid)
-      return res.status(400).json({ message: "Wrong password" });
+    console.log("🔐 Password comparison result:", valid);
+    
+    if (!valid) {
+      console.log("❌ Wrong password for:", email);
+      return res.status(400).json({ message: "Invalid credentials" });
+    }
 
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET);
+    const token = jwt.sign(
+      { id: user._id, role: role }, 
+      process.env.JWT_SECRET,
+      { expiresIn: "7d" }
+    );
+
+    console.log("✅ Login successful:", { email, role });
 
     res.json({
       message: "Login successful",
       token,
-      user: { name: user.name, email: user.email },
+      user: { 
+        id: user._id,
+        name: user.name, 
+        email: user.email,
+        role: role 
+      },
     });
   } catch (err) {
-    console.error("Login Error:", err);
+    console.error("❌ Login Error:", err);
     res.status(500).json({ message: "Server error" });
   }
 };

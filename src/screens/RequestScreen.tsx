@@ -40,6 +40,7 @@ const RequestScreen: React.FC = () => {
   const [requests, setRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [posting, setPosting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const services: Service[] = [
     { id: "1", name: "Doctor", emoji: "👨‍⚕️" },
@@ -53,13 +54,51 @@ const RequestScreen: React.FC = () => {
   const fetchRequests = async () => {
     try {
       setLoading(true);
+      setError(null);
+      
       const token = await AsyncStorage.getItem("token");
-      if (!token) return;
+      
+      if (!token) {
+        console.log("❌ No token found");
+        setError("Please login to view requests");
+        setRequests([]);
+        return;
+      }
 
+      console.log("📡 Fetching requests with token:", token.substring(0, 20) + "...");
+      
       const data = await getRequests(token);
-      setRequests(Array.isArray(data) ? data : []);
+      
+      console.log("✅ API Response:", JSON.stringify(data, null, 2));
+      
+      // Handle different response formats
+      let requestsArray: any[] = [];
+      
+      if (Array.isArray(data)) {
+        requestsArray = data;
+      } else if (data && data.requests && Array.isArray(data.requests)) {
+        requestsArray = data.requests;
+      } else if (data && data.data && Array.isArray(data.data)) {
+        requestsArray = data.data;
+      } else {
+        console.log("⚠️ Unexpected data format:", data);
+      }
+      
+      console.log(`📊 Found ${requestsArray.length} requests`);
+      setRequests(requestsArray);
+      
     } catch (err: any) {
-      console.log("GET REQUEST ERROR:", err);
+      console.log("❌ GET REQUEST ERROR:", err);
+      console.log("Error details:", err.response?.data || err.message);
+      
+      const errorMessage = err.response?.data?.message || err.message || "Failed to fetch requests";
+      setError(errorMessage);
+      
+      // If token is invalid, clear it
+      if (err.response?.status === 401 || err.response?.status === 403) {
+        await AsyncStorage.removeItem("token");
+        Alert.alert("Session Expired", "Please login again");
+      }
     } finally {
       setLoading(false);
     }
@@ -87,6 +126,8 @@ const RequestScreen: React.FC = () => {
         return;
       }
 
+      console.log("📤 Creating request:", { serviceType: selectedService, description, location });
+
       await createRequest(token, {
         serviceType: selectedService,
         description,
@@ -103,7 +144,8 @@ const RequestScreen: React.FC = () => {
       // Refresh list
       fetchRequests();
     } catch (err: any) {
-      Alert.alert("Error", err.message || "Something went wrong");
+      console.log("❌ POST REQUEST ERROR:", err);
+      Alert.alert("Error", err.response?.data?.message || err.message || "Something went wrong");
     } finally {
       setPosting(false);
     }
@@ -179,6 +221,7 @@ const RequestScreen: React.FC = () => {
             variant="danger"
             size="large"
             fullWidth
+            disabled={posting}
           />
         </Card>
 
@@ -190,20 +233,41 @@ const RequestScreen: React.FC = () => {
 
         {/* Loader */}
         {loading && (
-          <ActivityIndicator size="large" color={colors.primary} />
+          <View style={styles.loaderContainer}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={styles.loadingText}>Loading requests...</Text>
+          </View>
+        )}
+
+        {/* Error State */}
+        {!loading && error && (
+          <Card style={styles.errorCard} padding={spacing.base}>
+            <Text style={styles.errorEmoji}>⚠️</Text>
+            <Text style={styles.errorText}>{error}</Text>
+            <Button
+              title="Retry"
+              onPress={fetchRequests}
+              variant="outline"
+              size="small"
+            />
+          </Card>
         )}
 
         {/* No Requests */}
-        {!loading && requests.length === 0 && (
-          <Text style={{ color: colors.textSecondary, textAlign: "center", marginTop: 20 }}>
-            No active requests found.
-          </Text>
+        {!loading && !error && requests.length === 0 && (
+          <Card style={styles.emptyCard} padding={spacing.xl}>
+            <Text style={styles.emptyEmoji}>📭</Text>
+            <Text style={styles.emptyTitle}>No Active Requests</Text>
+            <Text style={styles.emptyText}>
+              There are no emergency requests at the moment.
+            </Text>
+          </Card>
         )}
 
         {/* Render Requests */}
-        {requests.map((req: any) => (
+        {!loading && !error && requests.map((req: any) => (
           <EmergencyCard
-            key={req._id}
+            key={req._id || req.id}
             title={`${req.serviceType} Needed`}
             description={req.description}
             location={req.location}
@@ -308,5 +372,48 @@ const styles = StyleSheet.create({
   requestsCount: {
     fontSize: typography.fontSize.sm,
     color: colors.textSecondary,
+  },
+  loaderContainer: {
+    alignItems: "center",
+    paddingVertical: spacing.xl,
+  },
+  loadingText: {
+    marginTop: spacing.sm,
+    color: colors.textSecondary,
+    fontSize: typography.fontSize.sm,
+  },
+  errorCard: {
+    alignItems: "center",
+    backgroundColor: colors.backgroundLight,
+    marginVertical: spacing.base,
+  },
+  errorEmoji: {
+    fontSize: 48,
+    marginBottom: spacing.sm,
+  },
+  errorText: {
+    fontSize: typography.fontSize.md,
+    color: colors.accent,
+    textAlign: "center",
+    marginBottom: spacing.base,
+  },
+  emptyCard: {
+    alignItems: "center",
+    marginVertical: spacing.base,
+  },
+  emptyEmoji: {
+    fontSize: 64,
+    marginBottom: spacing.base,
+  },
+  emptyTitle: {
+    fontSize: typography.fontSize.xl,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.textPrimary,
+    marginBottom: spacing.xs,
+  },
+  emptyText: {
+    fontSize: typography.fontSize.sm,
+    color: colors.textSecondary,
+    textAlign: "center",
   },
 });

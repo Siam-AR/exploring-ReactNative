@@ -1,7 +1,3 @@
-// --------------------------
-// ProfileScreen.tsx (UPDATED)
-// --------------------------
-
 import React, { useEffect, useState } from "react";
 import {
   View,
@@ -90,8 +86,19 @@ const ProfileScreen: React.FC = () => {
 
     setLoading(true);
     try {
-      const res = await loginUser({ email, password });
-      const { token, user: resUser } = res.data;
+      console.log("🔐 Attempting login with:", email);
+      
+      // loginUser returns the response data directly
+      const res = await loginUser(email, password);
+      
+      console.log("✅ Login response:", res);
+      
+      const token = res.token;
+      const resUser = res.user;
+
+      if (!token || !resUser) {
+        throw new Error("Invalid response from server");
+      }
 
       await AsyncStorage.setItem("token", token);
       await AsyncStorage.setItem("user", JSON.stringify(resUser));
@@ -103,8 +110,8 @@ const ProfileScreen: React.FC = () => {
 
       Alert.alert("Success", "Logged in successfully");
     } catch (error: any) {
-      const msg =
-        error?.response?.data?.message || error.message || "Login failed";
+      console.error("❌ Login error:", error);
+      const msg = error?.message || "Login failed";
       Alert.alert("Login failed", msg);
     } finally {
       setLoading(false);
@@ -117,9 +124,16 @@ const ProfileScreen: React.FC = () => {
       return;
     }
 
+    if (password !== confirmPassword) {
+      Alert.alert("Error", "Passwords do not match");
+      return;
+    }
+
     setLoading(true);
     try {
-      await registerUser({
+      console.log("📝 Attempting registration for:", email);
+      
+      const res = await registerUser({
         name,
         email,
         password,
@@ -129,15 +143,20 @@ const ProfileScreen: React.FC = () => {
         address,
       });
 
+      console.log("✅ Registration response:", res);
+
       Alert.alert("Success", "Registration successful — please login");
       setActiveTab("login");
+      setName("");
+      setEmail("");
       setPassword("");
       setConfirmPassword("");
+      setAddress("");
+      setRole("Consumer");
+      setBloodGroup("A+");
     } catch (error: any) {
-      const msg =
-        error?.response?.data?.message ||
-        error.message ||
-        "Registration failed";
+      console.error("❌ Registration error:", error);
+      const msg = error?.message || "Registration failed";
       Alert.alert("Registration failed", msg);
     } finally {
       setLoading(false);
@@ -149,6 +168,7 @@ const ProfileScreen: React.FC = () => {
     await AsyncStorage.removeItem("user");
     setIsLoggedIn(false);
     setUser(null);
+    Alert.alert("Success", "Logged out successfully");
   };
 
   if (isLoggedIn && user) {
@@ -162,7 +182,10 @@ const ProfileScreen: React.FC = () => {
           }}
         />
 
-        <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.content}
+        >
           <Card style={styles.profileCard} padding={spacing.lg}>
             <View style={styles.avatarLarge}>
               <Text style={styles.avatarEmojiLarge}>👤</Text>
@@ -174,7 +197,9 @@ const ProfileScreen: React.FC = () => {
           <Card style={styles.availabilityCard} padding={spacing.base}>
             <View style={styles.availabilityRow}>
               <View>
-                <Text style={styles.availabilityTitle}>Available for Help</Text>
+                <Text style={styles.availabilityTitle}>
+                  Available for Help
+                </Text>
                 <Text style={styles.availabilitySubtitle}>
                   Toggle to show/hide from search
                 </Text>
@@ -210,7 +235,10 @@ const ProfileScreen: React.FC = () => {
         }}
       />
 
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.content}
+      >
         <View style={styles.tabs}>
           <TouchableOpacity
             style={[styles.tab, activeTab === "login" && styles.tabActive]}
@@ -364,23 +392,26 @@ const ProfileScreen: React.FC = () => {
           )}
 
           <Button
-            title={activeTab === "login" ? "Login" : "Register"}
+            title={loading ? "Please wait..." : activeTab === "login" ? "Login" : "Register"}
             onPress={activeTab === "login" ? handleLogin : handleRegister}
             variant="primary"
             size="large"
             fullWidth
+            disabled={loading}
           />
 
-          {loading && <ActivityIndicator style={{ marginTop: 12 }} />}
+          {loading && (
+            <ActivityIndicator
+              size="large"
+              color={colors.primary}
+              style={{ marginTop: spacing.base }}
+            />
+          )}
         </Card>
       </ScrollView>
     </View>
   );
 };
-
-// ---------------------------------------------------------------
-// UPDATED STYLES (Only 3 replaced)
-// ---------------------------------------------------------------
 
 const styles = StyleSheet.create({
   container: {
@@ -427,11 +458,6 @@ const styles = StyleSheet.create({
   inputIcon: {
     fontSize: 16,
   },
-
-  // ------------------------------------------------
-  // NEW REPLACED DROPDOWN STYLES (Option C)
-  // ------------------------------------------------
-
   dropdownList: {
     backgroundColor: colors.card,
     borderRadius: borderRadius.base,
@@ -445,7 +471,6 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     shadowOffset: { width: 0, height: 2 },
   },
-
   dropdownListScroll: {
     backgroundColor: colors.card,
     borderRadius: borderRadius.base,
@@ -460,14 +485,12 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     shadowOffset: { width: 0, height: 2 },
   },
-
   dropdownItem: {
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.base,
     fontSize: typography.fontSize.base,
     color: colors.textPrimary,
   },
-
   profileCard: {
     alignItems: "center",
     marginBottom: spacing.base,

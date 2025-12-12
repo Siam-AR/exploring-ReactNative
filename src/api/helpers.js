@@ -1,6 +1,7 @@
 import axios from "axios";
+import { API_CONFIG } from "../../config.js";
 
-const API_BASE = "http://192.168.1.13:5000";
+const API_BASE = API_CONFIG.BASE_URL;
 
 // GET ALL HELPERS
 export const getHelpers = async () => {

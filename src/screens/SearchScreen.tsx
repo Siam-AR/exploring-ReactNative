@@ -10,7 +10,7 @@ import HelperCard from '../components/HelperCard';
 import Card from '../components/Card';
 
 import { colors, typography, spacing, borderRadius, layout } from '../theme/theme';
-import { RootStackParamList } from '../types/navigation';
+import { RootStackParamList, Helper } from '../types/navigation';
 import { getHelpers } from '../api/helpers';
 
 interface Service {
@@ -26,8 +26,8 @@ const SearchScreen: React.FC = () => {
 
   const [selectedService, setSelectedService] = useState<string>('');
   const [location, setLocation] = useState<string>('');
-  const [helpers, setHelpers] = useState<any[]>([]);
-  const [filteredHelpers, setFilteredHelpers] = useState<any[]>([]);
+  const [helpers, setHelpers] = useState<Helper[]>([]);
+  const [filteredHelpers, setFilteredHelpers] = useState<Helper[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
 
   const services: Service[] = [
@@ -44,7 +44,8 @@ const SearchScreen: React.FC = () => {
       try {
         setLoading(true);
         const data = await getHelpers();
-        const arr = Array.isArray(data) ? data : [];
+
+        const arr: Helper[] = Array.isArray(data) ? data : [];
         setHelpers(arr);
         setFilteredHelpers(arr);
       } catch (err) {
@@ -61,14 +62,14 @@ const SearchScreen: React.FC = () => {
     let results = helpers;
 
     if (selectedService) {
-      results = results.filter((h: any) =>
-        (h?.service || '').toLowerCase() === selectedService.toLowerCase()
+      results = results.filter(
+        (h) => h.service.toLowerCase() === selectedService.toLowerCase()
       );
     }
 
     if (location) {
-      results = results.filter((h: any) =>
-        (h?.address || '').toLowerCase().includes(location.toLowerCase())
+      results = results.filter((h) =>
+        h.address.toLowerCase().includes(location.toLowerCase())
       );
     }
 
@@ -144,24 +145,17 @@ const SearchScreen: React.FC = () => {
         {loading ? (
           <ActivityIndicator size="large" color={colors.primary} />
         ) : (
-          filteredHelpers.map((helper) => {
-            const key = helper?._id ?? helper?.id ?? `${Math.random()}`;
-            const name = helper?.name ?? 'Unknown';
-            const service = helper?.service ?? 'Unknown';
-            const address = helper?.address ?? helper?.location ?? 'Unknown';
-
-            return (
-              <HelperCard
-                key={key}
-                name={name}
-                service={service}
-                location={address}
-                onPress={() =>
-                  navigation.navigate('HelperDetail', { helper })
-                }
-              />
-            );
-          })
+          filteredHelpers.map((helper) => (
+            <HelperCard
+              key={helper._id}
+              name={helper.name}
+              service={helper.service}
+              location={helper.address}
+              onPress={() =>
+                navigation.navigate("HelperDetail", { helper })
+              }
+            />
+          ))
         )}
       </ScrollView>
     </View>

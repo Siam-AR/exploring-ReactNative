@@ -4,6 +4,7 @@
  */
 
 export interface Colors {
+  [x: string]: any;
   primary: string;
   primaryLight: string;
   primaryDark: string;

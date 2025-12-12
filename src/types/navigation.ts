@@ -7,22 +7,18 @@ import { NavigatorScreenParams } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 
-// Helper data types
+// Updated Helper type based on your backend fields
 export interface Helper {
-  id: string;
+  _id: string;            // MongoDB ID
   name: string;
   service: string;
-  location: string;
-  rating: number;
-  hourlyRate: string;
-  experience?: string;
-  availability?: string;
+  address: string;        // backend uses "address"
   phone?: string;
   about?: string;
   imageUrl?: string;
 }
 
-// Bottom Tab Navigator Params
+// Bottom Tab Params
 export type BottomTabParamList = {
   Home: undefined;
   Search: undefined;
@@ -30,20 +26,23 @@ export type BottomTabParamList = {
   Profile: undefined;
 };
 
-// Root Stack Navigator Params
+// Root Stack Params
 export type RootStackParamList = {
   MainTabs: NavigatorScreenParams<BottomTabParamList>;
   HelperDetail: { helper: Helper };
 };
 
-// Screen Props Types
+// Screen Props
 export type HomeScreenProps = BottomTabScreenProps<BottomTabParamList, 'Home'>;
 export type SearchScreenProps = BottomTabScreenProps<BottomTabParamList, 'Search'>;
 export type RequestScreenProps = BottomTabScreenProps<BottomTabParamList, 'Request'>;
 export type ProfileScreenProps = BottomTabScreenProps<BottomTabParamList, 'Profile'>;
-export type HelperDetailScreenProps = NativeStackScreenProps<RootStackParamList, 'HelperDetail'>;
+export type HelperDetailScreenProps = NativeStackScreenProps<
+  RootStackParamList,
+  'HelperDetail'
+>;
 
-// Navigation Props (for useNavigation hook)
+// Navigation Props (global)
 declare global {
   namespace ReactNavigation {
     interface RootParamList extends RootStackParamList {}
