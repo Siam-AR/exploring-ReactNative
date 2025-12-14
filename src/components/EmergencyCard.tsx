@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Linking, Alert } from 'react-native';
 import Card from './Card';
 import { colors, typography, spacing, borderRadius } from '../theme/theme';
 
@@ -11,11 +11,16 @@ export interface EmergencyCardProps {
   location: string;
   timeAgo: string;
   status?: EmergencyStatus;
+  phone?: string;
+  whatsapp?: string;
+  onPress?: () => void;
+  onPhoneCall?: () => void;
+  onWhatsApp?: () => void;
 }
 
 /**
  * EmergencyCard Component
- * Displays emergency request information
+ * Displays emergency request information with contact buttons
  */
 const EmergencyCard: React.FC<EmergencyCardProps> = ({
   title,
@@ -23,6 +28,11 @@ const EmergencyCard: React.FC<EmergencyCardProps> = ({
   location,
   timeAgo,
   status = 'pending',
+  phone,
+  whatsapp,
+  onPress,
+  onPhoneCall,
+  onWhatsApp,
 }) => {
   const getStatusColor = (): string => {
     switch (status) {
@@ -50,8 +60,8 @@ const EmergencyCard: React.FC<EmergencyCardProps> = ({
     }
   };
 
-  return (
-    <Card style={styles.card} padding={spacing.base}>
+  const CardContent = (
+    <>
       <View style={styles.header}>
         <View style={styles.titleContainer}>
           <Text style={styles.emergencyIcon}>🚨</Text>
@@ -73,6 +83,53 @@ const EmergencyCard: React.FC<EmergencyCardProps> = ({
         
         <Text style={styles.timeAgo}>{timeAgo}</Text>
       </View>
+
+      {/* Contact Information */}
+      {(phone || whatsapp) && (
+        <View style={styles.contactInfo}>
+          <Text style={styles.contactLabel}>Contact:</Text>
+          <View style={styles.contactButtons}>
+            {phone && (
+              <TouchableOpacity 
+                style={styles.contactButton}
+                onPress={onPhoneCall}
+              >
+                <Text style={styles.contactButtonText}>📞 {phone}</Text>
+              </TouchableOpacity>
+            )}
+            {whatsapp && (
+              <TouchableOpacity 
+                style={styles.whatsappButton}
+                onPress={onWhatsApp}
+              >
+                <Text style={styles.whatsappButtonText}>💬 {whatsapp}</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      )}
+      
+      {onPress && (
+        <View style={styles.tapHint}>
+          <Text style={styles.tapHintText}>Tap to view details →</Text>
+        </View>
+      )}
+    </>
+  );
+
+  if (onPress) {
+    return (
+      <TouchableOpacity activeOpacity={0.7} onPress={onPress}>
+        <Card style={styles.card} padding={spacing.base}>
+          {CardContent}
+        </Card>
+      </TouchableOpacity>
+    );
+  }
+
+  return (
+    <Card style={styles.card} padding={spacing.base}>
+      {CardContent}
     </Card>
   );
 };
@@ -142,6 +199,64 @@ const styles = StyleSheet.create({
   timeAgo: {
     fontSize: typography.fontSize.sm,
     color: colors.textTertiary,
+  },
+
+  // Contact Info Styles
+  contactInfo: {
+    marginTop: spacing.md,
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  contactLabel: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.medium,
+    color: colors.textSecondary,
+    marginBottom: spacing.sm,
+  },
+  contactButtons: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  contactButton: {
+    flex: 1,
+    backgroundColor: colors.backgroundLight,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.sm,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    alignItems: 'center',
+  },
+  contactButtonText: {
+    fontSize: typography.fontSize.xs,
+    color: colors.primary,
+    fontWeight: typography.fontWeight.medium,
+  },
+  whatsappButton: {
+    flex: 1,
+    backgroundColor: '#25D366',
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.sm,
+    alignItems: 'center',
+  },
+  whatsappButtonText: {
+    fontSize: typography.fontSize.xs,
+    color: colors.textWhite,
+    fontWeight: typography.fontWeight.medium,
+  },
+
+  tapHint: {
+    marginTop: spacing.sm,
+    paddingTop: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  tapHintText: {
+    fontSize: typography.fontSize.xs,
+    color: colors.primary,
+    textAlign: 'center',
   },
 });
 

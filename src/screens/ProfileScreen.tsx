@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -9,7 +9,7 @@ import {
   Alert,
   ActivityIndicator,
 } from "react-native";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import Header from "../components/Header";
 import Input from "../components/Input";
 import Button from "../components/Button";
@@ -24,6 +24,8 @@ import {
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { loginUser, registerUser } from "../api/auth";
+import { getMyProfile, updateMyProfile } from "../api/helpers";
+import { getMyConsumerProfile, updateMyConsumerProfile } from "../api/consumer";
 
 type ActiveTab = "login" | "register";
 
@@ -39,29 +41,55 @@ const BLOOD_GROUPS = [
   "O-",
 ];
 
+const SERVICE_TYPES = [
+  "Doctor",
+  "Plumber",
+  "Electrician",
+  "Mechanic",
+  "Tutor",
+  "Cleaner",
+  "Carpenter",
+  "Painter",
+  "Blood Donor",
+  "Other",
+];
+
 const ProfileScreen: React.FC = () => {
   const navigation = useNavigation();
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<ActiveTab>("login");
 
+  // Auth fields
   const [name, setName] = useState<string>("");
   const [email, setEmail] = useState<string>("");
   const [password, setPassword] = useState<string>("");
   const [confirmPassword, setConfirmPassword] = useState<string>("");
-
   const [role, setRole] = useState<string>("Consumer");
   const [bloodGroup, setBloodGroup] = useState<string>("A+");
   const [address, setAddress] = useState<string>("");
 
+  // Dropdowns
   const [isRoleMenuOpen, setIsRoleMenuOpen] = useState(false);
   const [isBloodMenuOpen, setIsBloodMenuOpen] = useState(false);
 
   const [loading, setLoading] = useState<boolean>(false);
-  const [user, setUser] = useState<{ name?: string; email?: string } | null>(
-    null
-  );
+  const [user, setUser] = useState<any>(null);
 
-  const [isAvailable, setIsAvailable] = useState<boolean>(true);
+  // Helper profile fields
+  const [helperService, setHelperService] = useState<string>("");
+  const [helperPhone, setHelperPhone] = useState<string>("");
+  const [helperWhatsapp, setHelperWhatsapp] = useState<string>("");
+  const [helperAddress, setHelperAddress] = useState<string>("");
+  const [helperAvailable, setHelperAvailable] = useState<boolean>(true);
+  const [profileLoading, setProfileLoading] = useState<boolean>(false);
+  const [isEditingProfile, setIsEditingProfile] = useState<boolean>(false);
+
+  // Consumer profile fields
+  const [consumerPhone, setConsumerPhone] = useState<string>("");
+  const [consumerWhatsapp, setConsumerWhatsapp] = useState<string>("");
+  const [consumerAddress, setConsumerAddress] = useState<string>("");
+  const [consumerProfileLoading, setConsumerProfileLoading] = useState<boolean>(false);
+  const [isEditingConsumerProfile, setIsEditingConsumerProfile] = useState<boolean>(false);
 
   useEffect(() => {
     (async () => {
@@ -69,7 +97,8 @@ const ProfileScreen: React.FC = () => {
         const token = await AsyncStorage.getItem("token");
         const userJson = await AsyncStorage.getItem("user");
         if (token && userJson) {
-          setUser(JSON.parse(userJson));
+          const userData = JSON.parse(userJson);
+          setUser(userData);
           setIsLoggedIn(true);
         }
       } catch (err) {
@@ -77,6 +106,57 @@ const ProfileScreen: React.FC = () => {
       }
     })();
   }, []);
+
+  // Fetch helper profile when screen focuses
+  useFocusEffect(
+    useCallback(() => {
+      if (isLoggedIn && user?.role === "Helper") {
+        fetchHelperProfile();
+      } else if (isLoggedIn && user?.role === "Consumer") {
+        fetchConsumerProfile();
+      }
+    }, [isLoggedIn, user])
+  );
+
+  const fetchHelperProfile = async () => {
+    try {
+      setProfileLoading(true);
+      const token = await AsyncStorage.getItem("token");
+      if (!token) return;
+
+      const profile = await getMyProfile(token);
+
+      setHelperService(profile.service || "");
+      setHelperPhone(profile.phone || "");
+      setHelperWhatsapp(profile.whatsapp || "");
+      setHelperAddress(profile.address || "");
+      setHelperAvailable(
+        profile.available !== undefined ? profile.available : true
+      );
+    } catch (err: any) {
+      console.error("Failed to fetch helper profile:", err);
+    } finally {
+      setProfileLoading(false);
+    }
+  };
+
+  const fetchConsumerProfile = async () => {
+    try {
+      setConsumerProfileLoading(true);
+      const token = await AsyncStorage.getItem("token");
+      if (!token) return;
+
+      const profile = await getMyConsumerProfile(token);
+
+      setConsumerPhone(profile.phone || "");
+      setConsumerWhatsapp(profile.whatsapp || "");
+      setConsumerAddress(profile.address || "");
+    } catch (err: any) {
+      console.error("Failed to fetch consumer profile:", err);
+    } finally {
+      setConsumerProfileLoading(false);
+    }
+  };
 
   const handleLogin = async (): Promise<void> => {
     if (!email || !password) {
@@ -87,12 +167,10 @@ const ProfileScreen: React.FC = () => {
     setLoading(true);
     try {
       console.log("🔐 Attempting login with:", email);
-      
-      // loginUser returns the response data directly
+
       const res = await loginUser(email, password);
-      
       console.log("✅ Login response:", res);
-      
+
       const token = res.token;
       const resUser = res.user;
 
@@ -132,7 +210,7 @@ const ProfileScreen: React.FC = () => {
     setLoading(true);
     try {
       console.log("📝 Attempting registration for:", email);
-      
+
       const res = await registerUser({
         name,
         email,
@@ -163,19 +241,88 @@ const ProfileScreen: React.FC = () => {
     }
   };
 
+  const handleUpdateHelperProfile = async (): Promise<void> => {
+    if (!helperService || !helperPhone || !helperAddress) {
+      Alert.alert("Error", "Please fill service type, phone, and address");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const token = await AsyncStorage.getItem("token");
+      if (!token) {
+        Alert.alert("Error", "Not authenticated");
+        return;
+      }
+
+      await updateMyProfile(token, {
+        service: helperService,
+        phone: helperPhone,
+        whatsapp: helperWhatsapp,
+        address: helperAddress,
+        available: helperAvailable,
+      });
+
+      Alert.alert("Success", "Profile updated successfully");
+      setIsEditingProfile(false);
+      fetchHelperProfile();
+    } catch (error: any) {
+      console.error("❌ Update helper profile error:", error);
+      const msg = error?.message || "Failed to update profile";
+      Alert.alert("Update failed", msg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpdateConsumerProfile = async (): Promise<void> => {
+    if (!consumerPhone || !consumerAddress) {
+      Alert.alert("Error", "Please fill phone number and address");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const token = await AsyncStorage.getItem("token");
+      if (!token) {
+        Alert.alert("Error", "Not authenticated");
+        return;
+      }
+
+      await updateMyConsumerProfile(token, {
+        phone: consumerPhone,
+        whatsapp: consumerWhatsapp,
+        address: consumerAddress,
+      });
+
+      Alert.alert("Success", "Profile updated successfully");
+      setIsEditingConsumerProfile(false);
+      fetchConsumerProfile();
+    } catch (error: any) {
+      console.error("❌ Update consumer profile error:", error);
+      const msg = error?.message || "Failed to update profile";
+      Alert.alert("Update failed", msg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleLogout = async (): Promise<void> => {
     await AsyncStorage.removeItem("token");
     await AsyncStorage.removeItem("user");
     setIsLoggedIn(false);
     setUser(null);
+    setIsEditingProfile(false);
+    setIsEditingConsumerProfile(false);
     Alert.alert("Success", "Logged out successfully");
   };
 
-  if (isLoggedIn && user) {
+  // Helper Logged In View
+  if (isLoggedIn && user && user.role === "Helper") {
     return (
       <View style={styles.container}>
         <Header
-          title="My Profile"
+          title="Helper Profile"
           leftAction={{
             icon: <Text style={styles.backIcon}>←</Text>,
             onPress: () => navigation.goBack(),
@@ -185,6 +332,165 @@ const ProfileScreen: React.FC = () => {
         <ScrollView
           style={styles.scrollView}
           contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false}
+        >
+          <Card style={styles.profileCard} padding={spacing.lg}>
+            <View style={styles.avatarLarge}>
+              <Text style={styles.avatarEmojiLarge}>👨‍⚕️</Text>
+            </View>
+            <Text style={styles.profileName}>{user.name}</Text>
+            <Text style={styles.profileEmail}>{user.email}</Text>
+            <Text style={styles.roleTag}>Helper Account</Text>
+          </Card>
+
+          {profileLoading ? (
+            <ActivityIndicator size="large" color={colors.primary} />
+          ) : (
+            <>
+              <Card style={styles.formCard} padding={spacing.lg}>
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitle}>Profile Information</Text>
+                  {!isEditingProfile && (
+                    <TouchableOpacity onPress={() => setIsEditingProfile(true)}>
+                      <Text style={styles.editButton}>Edit</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                {/* Service Type Chips */}
+                <Text style={styles.label}>Service Type *</Text>
+                <View style={styles.chipsContainer}>
+                  {SERVICE_TYPES.map((service) => (
+                    <TouchableOpacity
+                      key={service}
+                      style={[
+                        styles.serviceChip,
+                        helperService === service && styles.serviceChipActive,
+                        !isEditingProfile && styles.serviceChipDisabled,
+                      ]}
+                      onPress={() => isEditingProfile && setHelperService(service)}
+                      disabled={!isEditingProfile}
+                    >
+                      <Text
+                        style={[
+                          styles.serviceChipText,
+                          helperService === service &&
+                            styles.serviceChipTextActive,
+                        ]}
+                      >
+                        {service}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                {/* Phone */}
+                <Input
+                  label="Phone Number *"
+                  placeholder="Enter phone number"
+                  value={helperPhone}
+                  onChangeText={setHelperPhone}
+                  keyboardType="phone-pad"
+                  editable={isEditingProfile}
+                  icon={<Text style={styles.inputIcon}>📱</Text>}
+                />
+
+                {/* WhatsApp */}
+                <Input
+                  label="WhatsApp Number"
+                  placeholder="Enter WhatsApp number"
+                  value={helperWhatsapp}
+                  onChangeText={setHelperWhatsapp}
+                  keyboardType="phone-pad"
+                  editable={isEditingProfile}
+                  icon={<Text style={styles.inputIcon}>💬</Text>}
+                />
+
+                {/* Address */}
+                <Input
+                  label="Address *"
+                  placeholder="Enter your address"
+                  value={helperAddress}
+                  onChangeText={setHelperAddress}
+                  multiline
+                  numberOfLines={3}
+                  editable={isEditingProfile}
+                  icon={<Text style={styles.inputIcon}>📍</Text>}
+                />
+
+                {/* Availability Toggle */}
+                <View style={styles.availabilityRow}>
+                  <View>
+                    <Text style={styles.availabilityTitle}>
+                      Available for Help
+                    </Text>
+                    <Text style={styles.availabilitySubtitle}>
+                      Toggle to show/hide from search
+                    </Text>
+                  </View>
+                  <Switch
+                    value={helperAvailable}
+                    onValueChange={setHelperAvailable}
+                    disabled={!isEditingProfile}
+                    trackColor={{ false: colors.border, true: colors.primary }}
+                    thumbColor={colors.card}
+                  />
+                </View>
+
+                {isEditingProfile && (
+                  <View style={styles.buttonRow}>
+                    <Button
+                      title="Cancel"
+                      onPress={() => {
+                        setIsEditingProfile(false);
+                        fetchHelperProfile();
+                      }}
+                      variant="outline"
+                      size="medium"
+                      style={{ flex: 1, marginRight: spacing.xs }}
+                    />
+                    <Button
+                      title={loading ? "Saving..." : "Save"}
+                      onPress={handleUpdateHelperProfile}
+                      variant="primary"
+                      size="medium"
+                      disabled={loading}
+                      style={{ flex: 1, marginLeft: spacing.xs }}
+                    />
+                  </View>
+                )}
+              </Card>
+
+              <Button
+                title="Logout"
+                onPress={handleLogout}
+                variant="danger"
+                size="large"
+                fullWidth
+              />
+            </>
+          )}
+        </ScrollView>
+      </View>
+    );
+  }
+
+  // Consumer Logged In View
+  if (isLoggedIn && user && user.role === "Consumer") {
+    return (
+      <View style={styles.container}>
+        <Header
+          title="Consumer Profile"
+          leftAction={{
+            icon: <Text style={styles.backIcon}>←</Text>,
+            onPress: () => navigation.goBack(),
+          }}
+        />
+
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false}
         >
           <Card style={styles.profileCard} padding={spacing.lg}>
             <View style={styles.avatarLarge}>
@@ -192,39 +498,98 @@ const ProfileScreen: React.FC = () => {
             </View>
             <Text style={styles.profileName}>{user.name}</Text>
             <Text style={styles.profileEmail}>{user.email}</Text>
+            <Text style={styles.roleTag}>Consumer Account</Text>
           </Card>
 
-          <Card style={styles.availabilityCard} padding={spacing.base}>
-            <View style={styles.availabilityRow}>
-              <View>
-                <Text style={styles.availabilityTitle}>
-                  Available for Help
-                </Text>
-                <Text style={styles.availabilitySubtitle}>
-                  Toggle to show/hide from search
-                </Text>
-              </View>
-              <Switch
-                value={isAvailable}
-                onValueChange={setIsAvailable}
-                trackColor={{ false: colors.border, true: colors.primary }}
-                thumbColor={colors.card}
+          {consumerProfileLoading ? (
+            <ActivityIndicator size="large" color={colors.primary} />
+          ) : (
+            <>
+              <Card style={styles.formCard} padding={spacing.lg}>
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitle}>Contact Information</Text>
+                  {!isEditingConsumerProfile && (
+                    <TouchableOpacity
+                      onPress={() => setIsEditingConsumerProfile(true)}
+                    >
+                      <Text style={styles.editButton}>Edit</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                {/* Phone */}
+                <Input
+                  label="Phone Number *"
+                  placeholder="Enter phone number"
+                  value={consumerPhone}
+                  onChangeText={setConsumerPhone}
+                  keyboardType="phone-pad"
+                  editable={isEditingConsumerProfile}
+                  icon={<Text style={styles.inputIcon}>📱</Text>}
+                />
+
+                {/* WhatsApp */}
+                <Input
+                  label="WhatsApp Number"
+                  placeholder="Enter WhatsApp number"
+                  value={consumerWhatsapp}
+                  onChangeText={setConsumerWhatsapp}
+                  keyboardType="phone-pad"
+                  editable={isEditingConsumerProfile}
+                  icon={<Text style={styles.inputIcon}>💬</Text>}
+                />
+
+                {/* Address */}
+                <Input
+                  label="Address *"
+                  placeholder="Enter your address / location"
+                  value={consumerAddress}
+                  onChangeText={setConsumerAddress}
+                  multiline
+                  numberOfLines={3}
+                  editable={isEditingConsumerProfile}
+                  icon={<Text style={styles.inputIcon}>📍</Text>}
+                />
+
+                {isEditingConsumerProfile && (
+                  <View style={styles.buttonRow}>
+                    <Button
+                      title="Cancel"
+                      onPress={() => {
+                        setIsEditingConsumerProfile(false);
+                        fetchConsumerProfile();
+                      }}
+                      variant="outline"
+                      size="medium"
+                      style={{ flex: 1, marginRight: spacing.xs }}
+                    />
+                    <Button
+                      title={loading ? "Saving..." : "Save"}
+                      onPress={handleUpdateConsumerProfile}
+                      variant="primary"
+                      size="medium"
+                      disabled={loading}
+                      style={{ flex: 1, marginLeft: spacing.xs }}
+                    />
+                  </View>
+                )}
+              </Card>
+
+              <Button
+                title="Logout"
+                onPress={handleLogout}
+                variant="outline"
+                size="large"
+                fullWidth
               />
-            </View>
-          </Card>
-
-          <Button
-            title="Logout"
-            onPress={handleLogout}
-            variant="outline"
-            size="large"
-            fullWidth
-          />
+            </>
+          )}
         </ScrollView>
       </View>
     );
   }
 
+  // Login/Register View
   return (
     <View style={styles.container}>
       <Header
@@ -392,7 +757,13 @@ const ProfileScreen: React.FC = () => {
           )}
 
           <Button
-            title={loading ? "Please wait..." : activeTab === "login" ? "Login" : "Register"}
+            title={
+              loading
+                ? "Please wait..."
+                : activeTab === "login"
+                ? "Login"
+                : "Register"
+            }
             onPress={activeTab === "login" ? handleLogin : handleRegister}
             variant="primary"
             size="large"
@@ -458,12 +829,49 @@ const styles = StyleSheet.create({
   inputIcon: {
     fontSize: 16,
   },
+  label: {
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.medium,
+    color: colors.textSecondary,
+    marginBottom: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  chipsContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm,
+    marginBottom: spacing.base,
+  },
+  serviceChip: {
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.sm,
+    backgroundColor: colors.backgroundDark,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  serviceChipActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  serviceChipDisabled: {
+    opacity: 0.6,
+  },
+  serviceChipText: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.medium,
+    color: colors.textSecondary,
+  },
+  serviceChipTextActive: {
+    color: colors.textWhite,
+  },
   dropdownList: {
     backgroundColor: colors.card,
     borderRadius: borderRadius.base,
     borderWidth: 1,
     borderColor: colors.border,
     marginTop: spacing.xs,
+    marginBottom: spacing.sm,
     paddingVertical: spacing.xs,
     elevation: 2,
     shadowColor: "#000",
@@ -477,6 +885,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     marginTop: spacing.xs,
+    marginBottom: spacing.sm,
     paddingVertical: spacing.xs,
     maxHeight: 150,
     elevation: 2,
@@ -511,18 +920,46 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize["2xl"],
     fontWeight: typography.fontWeight.bold,
     color: colors.textPrimary,
+    marginBottom: spacing.xs,
   },
   profileEmail: {
     fontSize: typography.fontSize.base,
     color: colors.textSecondary,
+    marginBottom: spacing.xs,
   },
-  availabilityCard: {
+  roleTag: {
+    fontSize: typography.fontSize.sm,
+    color: colors.primary,
+    backgroundColor: colors.backgroundLight,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.sm,
+    marginTop: spacing.xs,
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: spacing.base,
+  },
+  sectionTitle: {
+    fontSize: typography.fontSize.xl,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.textPrimary,
+  },
+  editButton: {
+    fontSize: typography.fontSize.base,
+    color: colors.primary,
+    fontWeight: typography.fontWeight.medium,
   },
   availabilityRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    marginTop: spacing.base,
+    paddingTop: spacing.base,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
   },
   availabilityTitle: {
     fontSize: typography.fontSize.lg,
@@ -532,6 +969,10 @@ const styles = StyleSheet.create({
   availabilitySubtitle: {
     fontSize: typography.fontSize.sm,
     color: colors.textSecondary,
+  },
+  buttonRow: {
+    flexDirection: "row",
+    marginTop: spacing.base,
   },
 });
 

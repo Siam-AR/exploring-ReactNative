@@ -1,9 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, RefreshControl, ActivityIndicator } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { colors, typography, spacing, borderRadius, shadows, layout } from '../theme/theme';
 import { HomeScreenProps } from '../types/navigation';
-import { getStats } from '../api/auth'; // <-- Added import
+import { getStats } from '../api/stats';
+
+interface Stats {
+  helpers: number;
+  consumers: number;
+  requests: number;
+  availableHelpers: number;
+  activeRequests: number;
+  recentHelpers: number;
+  recentRequests: number;
+  serviceBreakdown: Array<{ service: string; count: number }>;
+  lastUpdated?: string;
+}
 
 /**
  * HomeScreen
@@ -14,10 +26,17 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const [showAbout, setShowAbout] = useState<boolean>(false);
 
   // Stats state
-  const [stats, setStats] = useState({ helpers: 0, consumers: 0 });
+  const [stats, setStats] = useState<Stats>({
+    helpers: 0,
+    consumers: 0,
+    requests: 0,
+    availableHelpers: 0,
+    activeRequests: 0,
+    recentHelpers: 0,
+    recentRequests: 0,
+    serviceBreakdown: [],
+  });
   const [loadingStats, setLoadingStats] = useState(true);
-
-  // Refresh state
   const [refreshing, setRefreshing] = useState(false);
 
   // Fetch stats on mount
@@ -107,6 +126,23 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             </View>
           </TouchableOpacity>
 
+          {/* Post Emergency Request */}
+          <TouchableOpacity
+            style={[styles.actionCard, styles.dangerCard]}
+            onPress={() => navigation.navigate('Request')}
+            activeOpacity={0.9}
+          >
+            <View style={styles.cardContent}>
+              <View style={styles.cardLeft}>
+                <Text style={styles.cardEmoji}>🚨</Text>
+                <Text style={styles.cardTitle}>Emergency Request</Text>
+                <Text style={styles.cardDescription}>
+                  Post urgent help requests to your community
+                </Text>
+              </View>
+            </View>
+          </TouchableOpacity>
+
           {/* Become a Helper */}
           <TouchableOpacity
             style={[styles.actionCard, styles.secondaryCard]}
@@ -125,21 +161,86 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           </TouchableOpacity>
         </View>
 
-        {/* Community Stats */}
-        <View style={styles.stats}>
-          <View style={[styles.statCard, styles.statCardPrimary]}>
-            <Text style={styles.statNumber}>
-              {loadingStats ? "…" : stats.helpers}
-            </Text>
-            <Text style={styles.statLabel}>Total Helpers</Text>
-          </View>
+        {/* Community Stats Section */}
+        <View style={styles.statsSection}>
+          <Text style={styles.statsTitle}>Community Stats</Text>
+          
+          {loadingStats ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={colors.primary} />
+              <Text style={styles.loadingText}>Loading statistics...</Text>
+            </View>
+          ) : (
+            <>
+              {/* Primary Stats Grid */}
+              <View style={styles.statsGrid}>
+                <View style={[styles.statCard, styles.statCardPrimary]}>
+                  <Text style={styles.statIcon}>👥</Text>
+                  <Text style={styles.statNumber}>{stats.helpers}</Text>
+                  <Text style={styles.statLabel}>Total Helpers</Text>
+                </View>
 
-          <View style={[styles.statCard, styles.statCardSecondary]}>
-            <Text style={styles.statNumber}>
-              {loadingStats ? "…" : stats.consumers}
-            </Text>
-            <Text style={styles.statLabel}>Total Consumers</Text>
-          </View>
+                <View style={[styles.statCard, styles.statCardSecondary]}>
+                  <Text style={styles.statIcon}>🙋</Text>
+                  <Text style={styles.statNumber}>{stats.consumers}</Text>
+                  <Text style={styles.statLabel}>Total Consumers</Text>
+                </View>
+              </View>
+
+              {/* Secondary Stats Grid */}
+              <View style={styles.statsGrid}>
+                <View style={[styles.statCard, styles.statCardSuccess]}>
+                  <Text style={styles.statIcon}>✅</Text>
+                  <Text style={styles.statNumber}>{stats.availableHelpers}</Text>
+                  <Text style={styles.statLabel}>Available Now</Text>
+                </View>
+
+                <View style={[styles.statCard, styles.statCardWarning]}>
+                  <Text style={styles.statIcon}>📋</Text>
+                  <Text style={styles.statNumber}>{stats.activeRequests}</Text>
+                  <Text style={styles.statLabel}>Active Requests</Text>
+                </View>
+              </View>
+
+              {/* Recent Activity */}
+              <View style={styles.activityCard}>
+                <Text style={styles.activityTitle}>📈 Recent Activity (7 days)</Text>
+                <View style={styles.activityRow}>
+                  <View style={styles.activityItem}>
+                    <Text style={styles.activityValue}>+{stats.recentHelpers}</Text>
+                    <Text style={styles.activityLabel}>New Helpers</Text>
+                  </View>
+                  <View style={styles.activityDivider} />
+                  <View style={styles.activityItem}>
+                    <Text style={styles.activityValue}>+{stats.recentRequests}</Text>
+                    <Text style={styles.activityLabel}>New Requests</Text>
+                  </View>
+                </View>
+              </View>
+
+              {/* Service Breakdown */}
+              {stats.serviceBreakdown && stats.serviceBreakdown.length > 0 && (
+                <View style={styles.servicesCard}>
+                  <Text style={styles.servicesTitle}>🛠️ Popular Services</Text>
+                  {stats.serviceBreakdown.map((service, index) => (
+                    <View key={index} style={styles.serviceRow}>
+                      <Text style={styles.serviceName}>{service.service}</Text>
+                      <View style={styles.serviceCountBadge}>
+                        <Text style={styles.serviceCount}>{service.count}</Text>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              )}
+
+              {/* Last Updated */}
+              {stats.lastUpdated && (
+                <Text style={styles.lastUpdated}>
+                  Last updated: {new Date(stats.lastUpdated).toLocaleTimeString()}
+                </Text>
+              )}
+            </>
+          )}
         </View>
       </ScrollView>
 
@@ -160,11 +261,11 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
               style={styles.menuItem}
               onPress={() => {
                 setShowMenu(false);
-                // Toggle theme functionality
+                fetchStats();
               }}
             >
-              <Text style={styles.menuItemIcon}>🌙</Text>
-              <Text style={styles.menuItemText}>Toggle Theme</Text>
+              <Text style={styles.menuItemIcon}>🔄</Text>
+              <Text style={styles.menuItemText}>Refresh Stats</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -182,7 +283,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
               style={styles.menuItem}
               onPress={() => {
                 setShowMenu(false);
-                // Help & Feedback functionality
               }}
             >
               <Text style={styles.menuItemIcon}>💬</Text>
@@ -204,7 +304,12 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             <Text style={styles.aboutTitle}>About Mini Bangladesh</Text>
             <Text style={styles.aboutText}>
               Mini Bangladesh connects local people with nearby service providers.
-              Find trusted helpers in your community for any task.
+              Find trusted helpers in your community for any task – from tutoring
+              to plumbing, from medical assistance to blood donation.
+            </Text>
+            <Text style={styles.aboutText}>
+              Join our growing community of {stats.helpers + stats.consumers} members
+              working together to make Bangladesh better!
             </Text>
             <TouchableOpacity
               style={styles.closeButton}
@@ -294,6 +399,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
   },
   secondaryCard: {
+    backgroundColor: '#2E7D32', // Green
+  },
+  dangerCard: {
     backgroundColor: colors.accent,
   },
   cardContent: {
@@ -309,7 +417,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   cardTitle: {
-    fontSize: typography.fontSize['3xl'],
+    fontSize: typography.fontSize['2xl'],
     fontWeight: typography.fontWeight.bold,
     color: colors.textWhite,
     marginBottom: spacing.sm,
@@ -320,27 +428,56 @@ const styles = StyleSheet.create({
     opacity: 0.9,
     lineHeight: 20,
   },
-  stats: {
+
+  // Stats Section
+  statsSection: {
+    marginBottom: spacing.xl,
+  },
+  statsTitle: {
+    fontSize: typography.fontSize['2xl'],
+    fontWeight: typography.fontWeight.bold,
+    color: colors.textPrimary,
+    marginBottom: spacing.base,
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    paddingVertical: spacing.xl,
+  },
+  loadingText: {
+    marginTop: spacing.sm,
+    fontSize: typography.fontSize.sm,
+    color: colors.textSecondary,
+  },
+  statsGrid: {
     flexDirection: 'row',
     gap: spacing.base,
+    marginBottom: spacing.base,
   },
   statCard: {
     flex: 1,
     borderRadius: borderRadius.md,
     padding: spacing.lg,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: "#ffffff22",
+    ...shadows.sm,
   },
   statCardPrimary: {
-    backgroundColor: "#234C6A", 
+    backgroundColor: '#1976D2',
   },
   statCardSecondary: {
-    backgroundColor: "#234C6A", 
+    backgroundColor: '#7B1FA2',
   },
-
+  statCardSuccess: {
+    backgroundColor: '#388E3C',
+  },
+  statCardWarning: {
+    backgroundColor: '#F57C00',
+  },
+  statIcon: {
+    fontSize: 32,
+    marginBottom: spacing.xs,
+  },
   statNumber: {
-    fontSize: typography.fontSize['5xl'],
+    fontSize: typography.fontSize['4xl'],
     fontWeight: typography.fontWeight.bold,
     color: colors.textWhite,
     marginBottom: spacing.xs,
@@ -351,6 +488,92 @@ const styles = StyleSheet.create({
     opacity: 0.9,
     textAlign: 'center',
   },
+
+  // Activity Card
+  activityCard: {
+    backgroundColor: colors.card,
+    borderRadius: borderRadius.md,
+    padding: spacing.lg,
+    marginBottom: spacing.base,
+    ...shadows.sm,
+  },
+  activityTitle: {
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.textPrimary,
+    marginBottom: spacing.md,
+  },
+  activityRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  activityItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  activityValue: {
+    fontSize: typography.fontSize['3xl'],
+    fontWeight: typography.fontWeight.bold,
+    color: colors.primary,
+    marginBottom: spacing.xs,
+  },
+  activityLabel: {
+    fontSize: typography.fontSize.sm,
+    color: colors.textSecondary,
+  },
+  activityDivider: {
+    width: 1,
+    height: 40,
+    backgroundColor: colors.border,
+    marginHorizontal: spacing.base,
+  },
+
+  // Services Card
+  servicesCard: {
+    backgroundColor: colors.card,
+    borderRadius: borderRadius.md,
+    padding: spacing.lg,
+    marginBottom: spacing.base,
+    ...shadows.sm,
+  },
+  servicesTitle: {
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.textPrimary,
+    marginBottom: spacing.md,
+  },
+  serviceRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  serviceName: {
+    fontSize: typography.fontSize.base,
+    color: colors.textPrimary,
+  },
+  serviceCountBadge: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.sm,
+  },
+  serviceCount: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.textWhite,
+  },
+
+  lastUpdated: {
+    fontSize: typography.fontSize.xs,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginTop: spacing.sm,
+  },
+
+  // Modal Styles
   modalOverlay: {
     flex: 1,
     backgroundColor: colors.overlay,
@@ -398,13 +621,14 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.base,
     color: colors.textSecondary,
     lineHeight: 24,
-    marginBottom: spacing.xl,
+    marginBottom: spacing.base,
   },
   closeButton: {
     backgroundColor: colors.primary,
     borderRadius: borderRadius.base,
     paddingVertical: spacing.md,
     alignItems: 'center',
+    marginTop: spacing.base,
   },
   closeButtonText: {
     fontSize: typography.fontSize.base,

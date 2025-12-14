@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import React, { useEffect, useState, useCallback } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import Header from '../components/Header';
 import Input from '../components/Input';
@@ -27,55 +28,140 @@ const SearchScreen: React.FC = () => {
   const [selectedService, setSelectedService] = useState<string>('');
   const [location, setLocation] = useState<string>('');
   const [helpers, setHelpers] = useState<Helper[]>([]);
-  const [filteredHelpers, setFilteredHelpers] = useState<Helper[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
+  const [userRole, setUserRole] = useState<string | null>(null);
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
 
   const services: Service[] = [
-    { id: '1', name: 'Tutor', emoji: '📚' },
-    { id: '2', name: 'Doctor', emoji: '👨‍⚕️' },
-    { id: '3', name: 'Plumber', emoji: '🔧' },
-    { id: '4', name: 'Electrician', emoji: '⚡' },
-    { id: '5', name: 'Cleaner', emoji: '🧹' },
-    { id: '6', name: 'Mechanic', emoji: '🔩' },
+    { id: '1', name: 'Doctor', emoji: '👨‍⚕️' },
+    { id: '2', name: 'Plumber', emoji: '🔧' },
+    { id: '3', name: 'Electrician', emoji: '⚡' },
+    { id: '4', name: 'Tutor', emoji: '📚' },
+    { id: '5', name: 'Mechanic', emoji: '🔩' },
+    { id: '6', name: 'Cleaner', emoji: '🧹' },
+    { id: '7', name: 'Carpenter', emoji: '🪚' },
+    { id: '8', name: 'Painter', emoji: '🎨' },
+    { id: '9', name: 'Blood Donor', emoji: '🩸' },
   ];
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        const data = await getHelpers();
+  // Check user role on mount and when screen focuses
+  useFocusEffect(
+    useCallback(() => {
+      checkUserRole();
+    }, [])
+  );
 
-        const arr: Helper[] = Array.isArray(data) ? data : [];
-        setHelpers(arr);
-        setFilteredHelpers(arr);
-      } catch (err) {
-        console.error("Helpers Fetch Error:", err);
-      } finally {
-        setLoading(false);
+  const checkUserRole = async () => {
+    try {
+      const userJson = await AsyncStorage.getItem('user');
+      if (userJson) {
+        const user = JSON.parse(userJson);
+        setUserRole(user.role);
+        setIsLoggedIn(true);
+        
+        // If Consumer, fetch helpers automatically
+        if (user.role === 'Consumer') {
+          fetchHelpers();
+        }
+      } else {
+        setIsLoggedIn(false);
+        setUserRole(null);
       }
-    };
-
-    fetchData();
-  }, []);
-
-  const handleSearch = () => {
-    let results = helpers;
-
-    if (selectedService) {
-      results = results.filter(
-        (h) => h.service.toLowerCase() === selectedService.toLowerCase()
-      );
+    } catch (err) {
+      console.error('Error checking user role:', err);
     }
-
-    if (location) {
-      results = results.filter((h) =>
-        h.address.toLowerCase().includes(location.toLowerCase())
-      );
-    }
-
-    setFilteredHelpers(results);
   };
 
+  const fetchHelpers = async (serviceFilter?: string, locationFilter?: string) => {
+    try {
+      setLoading(true);
+      
+      const filters: any = {};
+      if (serviceFilter) filters.service = serviceFilter;
+      if (locationFilter) filters.location = locationFilter;
+      
+      const data = await getHelpers(filters);
+      const arr: Helper[] = Array.isArray(data) ? data : [];
+      setHelpers(arr);
+    } catch (err) {
+      console.error('Helpers Fetch Error:', err);
+      Alert.alert('Error', 'Failed to fetch helpers');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSearch = () => {
+    fetchHelpers(selectedService, location);
+  };
+
+  const handleClearFilters = () => {
+    setSelectedService('');
+    setLocation('');
+    fetchHelpers();
+  };
+
+  // Helper Role Access Restriction
+  if (isLoggedIn && userRole === 'Helper') {
+    return (
+      <View style={styles.container}>
+        <Header
+          title="Find Helpers"
+          leftAction={{
+            icon: <Text style={styles.backIcon}>←</Text>,
+            onPress: () => navigation.goBack(),
+          }}
+        />
+        
+        <View style={styles.restrictedContainer}>
+          <Card style={styles.restrictedCard} padding={spacing.xl}>
+            <Text style={styles.restrictedEmoji}>🚫</Text>
+            <Text style={styles.restrictedTitle}>Access Restricted</Text>
+            <Text style={styles.restrictedText}>
+              Searching helpers is only available for consumers.
+            </Text>
+            <Text style={styles.restrictedSubtext}>
+              You are logged in as a Helper. Switch to a Consumer account to search for helpers.
+            </Text>
+          </Card>
+        </View>
+      </View>
+    );
+  }
+
+  // Not Logged In
+  if (!isLoggedIn) {
+    return (
+      <View style={styles.container}>
+        <Header
+          title="Find Helpers"
+          leftAction={{
+            icon: <Text style={styles.backIcon}>←</Text>,
+            onPress: () => navigation.goBack(),
+          }}
+        />
+        
+        <View style={styles.restrictedContainer}>
+          <Card style={styles.restrictedCard} padding={spacing.xl}>
+            <Text style={styles.restrictedEmoji}>🔒</Text>
+            <Text style={styles.restrictedTitle}>Login Required</Text>
+            <Text style={styles.restrictedText}>
+              Please login as a Consumer to search for helpers.
+            </Text>
+            <Button
+              title="Go to Profile"
+              onPress={() => navigation.navigate('MainTabs', { screen: 'Profile' })}
+              variant="primary"
+              size="medium"
+              style={{ marginTop: spacing.base }}
+            />
+          </Card>
+        </View>
+      </View>
+    );
+  }
+
+  // Consumer View - Normal Search
   return (
     <View style={styles.container}>
       <Header
@@ -95,7 +181,7 @@ const SearchScreen: React.FC = () => {
         <Card style={styles.filterCard} padding={spacing.base}>
           <Text style={styles.sectionTitle}>Select Service</Text>
 
-          {/* Chips */}
+          {/* Service Chips */}
           <View style={styles.chipsContainer}>
             {services.map((service) => (
               <TouchableOpacity
@@ -121,38 +207,69 @@ const SearchScreen: React.FC = () => {
 
           <Input
             label="Location"
-            placeholder="Enter your area"
+            placeholder="Enter your area (e.g., Dhaka, Chittagong)"
             value={location}
             onChangeText={setLocation}
             icon={<Text style={styles.inputIcon}>📍</Text>}
           />
 
-          <Button
-            title="Search Helpers"
-            onPress={handleSearch}
-            variant="primary"
-            size="large"
-            fullWidth
-          />
+          <View style={styles.buttonRow}>
+            <Button
+              title="Clear"
+              onPress={handleClearFilters}
+              variant="outline"
+              size="medium"
+              style={{ flex: 1, marginRight: spacing.xs }}
+            />
+            <Button
+              title="Search Helpers"
+              onPress={handleSearch}
+              variant="primary"
+              size="medium"
+              style={{ flex: 1, marginLeft: spacing.xs }}
+            />
+          </View>
         </Card>
+
+        {/* Active Filters Display */}
+        {(selectedService || location) && (
+          <View style={styles.activeFilters}>
+            <Text style={styles.activeFiltersText}>
+              Filters: {selectedService && `Service: ${selectedService}`}
+              {selectedService && location && ' • '}
+              {location && `Location: ${location}`}
+            </Text>
+          </View>
+        )}
 
         {/* Results */}
         <View style={styles.resultsSection}>
           <Text style={styles.resultsTitle}>Available Helpers</Text>
-          <Text style={styles.resultsCount}>{filteredHelpers.length} found</Text>
+          <Text style={styles.resultsCount}>{helpers.length} found</Text>
         </View>
 
         {loading ? (
-          <ActivityIndicator size="large" color={colors.primary} />
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={styles.loadingText}>Searching helpers...</Text>
+          </View>
+        ) : helpers.length === 0 ? (
+          <Card style={styles.emptyCard} padding={spacing.xl}>
+            <Text style={styles.emptyEmoji}>🔍</Text>
+            <Text style={styles.emptyTitle}>No Helpers Found</Text>
+            <Text style={styles.emptyText}>
+              Try adjusting your filters or search in a different location.
+            </Text>
+          </Card>
         ) : (
-          filteredHelpers.map((helper) => (
+          helpers.map((helper) => (
             <HelperCard
               key={helper._id}
               name={helper.name}
               service={helper.service}
               location={helper.address}
               onPress={() =>
-                navigation.navigate("HelperDetail", { helper })
+                navigation.navigate('HelperDetail', { helper })
               }
             />
           ))
@@ -171,7 +288,7 @@ const styles = StyleSheet.create({
   },
   backIcon: { fontSize: 24, color: colors.textPrimary },
 
-  filterCard: { marginBottom: spacing.xl },
+  filterCard: { marginBottom: spacing.base },
 
   sectionTitle: {
     fontSize: typography.fontSize.lg,
@@ -215,6 +332,23 @@ const styles = StyleSheet.create({
 
   inputIcon: { fontSize: 16 },
 
+  buttonRow: {
+    flexDirection: 'row',
+    marginTop: spacing.sm,
+  },
+
+  activeFilters: {
+    backgroundColor: colors.backgroundLight,
+    padding: spacing.sm,
+    borderRadius: borderRadius.sm,
+    marginBottom: spacing.base,
+  },
+
+  activeFiltersText: {
+    fontSize: typography.fontSize.sm,
+    color: colors.textSecondary,
+  },
+
   resultsSection: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -231,6 +365,78 @@ const styles = StyleSheet.create({
   resultsCount: {
     fontSize: typography.fontSize.sm,
     color: colors.textSecondary,
+  },
+
+  loadingContainer: {
+    alignItems: 'center',
+    paddingVertical: spacing.xl,
+  },
+
+  loadingText: {
+    marginTop: spacing.sm,
+    fontSize: typography.fontSize.sm,
+    color: colors.textSecondary,
+  },
+
+  emptyCard: {
+    alignItems: 'center',
+  },
+
+  emptyEmoji: {
+    fontSize: 64,
+    marginBottom: spacing.base,
+  },
+
+  emptyTitle: {
+    fontSize: typography.fontSize.xl,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.textPrimary,
+    marginBottom: spacing.xs,
+  },
+
+  emptyText: {
+    fontSize: typography.fontSize.sm,
+    color: colors.textSecondary,
+    textAlign: 'center',
+  },
+
+  // Restricted Access Styles
+  restrictedContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.xl,
+  },
+
+  restrictedCard: {
+    alignItems: 'center',
+    maxWidth: 400,
+  },
+
+  restrictedEmoji: {
+    fontSize: 80,
+    marginBottom: spacing.lg,
+  },
+
+  restrictedTitle: {
+    fontSize: typography.fontSize['2xl'],
+    fontWeight: typography.fontWeight.bold,
+    color: colors.textPrimary,
+    marginBottom: spacing.sm,
+    textAlign: 'center',
+  },
+
+  restrictedText: {
+    fontSize: typography.fontSize.lg,
+    color: colors.textPrimary,
+    textAlign: 'center',
+    marginBottom: spacing.sm,
+  },
+
+  restrictedSubtext: {
+    fontSize: typography.fontSize.sm,
+    color: colors.textSecondary,
+    textAlign: 'center',
   },
 });
 

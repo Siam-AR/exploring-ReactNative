@@ -7,15 +7,21 @@ import { NavigatorScreenParams } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 
-// Updated Helper type based on your backend fields
+// Updated Helper type based on backend fields
 export interface Helper {
-  _id: string;            // MongoDB ID
+  _id: string;
   name: string;
+  email: string;
   service: string;
-  address: string;        // backend uses "address"
+  address: string;
   phone?: string;
+  whatsapp?: string;
   about?: string;
+  bloodGroup?: string;
+  available?: boolean;
   imageUrl?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 // Bottom Tab Params

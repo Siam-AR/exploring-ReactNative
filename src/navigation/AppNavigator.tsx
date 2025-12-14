@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Text, TextStyle } from 'react-native';
 import {
   createNativeStackNavigator,
@@ -8,6 +8,7 @@ import {
   createBottomTabNavigator,
   BottomTabNavigationOptions,
 } from '@react-navigation/bottom-tabs';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { RootStackParamList, BottomTabParamList } from '../types/navigation';
 
@@ -73,7 +74,8 @@ const tabScreenOptions = ({
   } as TextStyle,
 });
 
-const TabNavigator: React.FC = () => {
+// Tab Navigator for Consumers (with Search)
+const ConsumerTabNavigator: React.FC = () => {
   return (
     <Tab.Navigator screenOptions={tabScreenOptions}>
       <Tab.Screen name="Home" component={HomeScreen} />
@@ -82,6 +84,56 @@ const TabNavigator: React.FC = () => {
       <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
   );
+};
+
+// Tab Navigator for Helpers (without Search)
+const HelperTabNavigator: React.FC = () => {
+  return (
+    <Tab.Navigator screenOptions={tabScreenOptions}>
+      <Tab.Screen name="Home" component={HomeScreen} />
+      <Tab.Screen name="Request" component={RequestScreen} />
+      <Tab.Screen name="Profile" component={ProfileScreen} />
+    </Tab.Navigator>
+  );
+};
+
+const TabNavigator: React.FC = () => {
+  const [userRole, setUserRole] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchUserRole = async () => {
+      try {
+        const userStr = await AsyncStorage.getItem('user');
+        if (userStr) {
+          const user = JSON.parse(userStr);
+          console.log('📍 User data:', user);
+          console.log('📍 User role:', user.role);
+          setUserRole(user.role?.trim() || null);
+        } else {
+          console.log('❌ No user data found');
+          setUserRole(null);
+        }
+      } catch (error) {
+        console.log('Error fetching user role:', error);
+        setUserRole(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUserRole();
+  }, []);
+
+  console.log('🎭 Current role:', userRole, '| Is Helper:', userRole?.toLowerCase() === 'helper');
+
+  // Show Consumer navigator if role is Consumer, Helper navigator if role is Helper
+  if (loading) {
+    return <ConsumerTabNavigator />;
+  }
+
+  const isHelper = userRole?.toLowerCase() === 'helper';
+  return isHelper ? <HelperTabNavigator /> : <ConsumerTabNavigator />;
 };
 
 const AppNavigator: React.FC = () => {
