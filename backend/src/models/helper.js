@@ -6,15 +6,15 @@ const helperSchema = new mongoose.Schema(
     email: { type: String, unique: true, required: true },
     password: { type: String, required: true },
 
-    // NEW FIELDS (match your React Native Helper type)
+    // Profile fields
     service: { type: String, default: "" },
     phone: { type: String, default: "" },
+    whatsapp: { type: String, default: "" },
     about: { type: String, default: "" },
+    address: { type: String, default: "" },
+    bloodGroup: { type: String, default: "A+" },
+    available: { type: Boolean, default: true },
     imageUrl: { type: String, default: "" },
-
-    // Existing fields
-    bloodGroup: String,
-    address: String,
   },
   { timestamps: true }
 );

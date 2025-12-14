@@ -1,4 +1,6 @@
 import Request from "../models/request.js";
+import Consumer from "../models/consumer.js";
+import Helper from "../models/helper.js";
 
 export const createRequest = async (req, res) => {
   try {
@@ -34,15 +36,25 @@ export const getAllRequests = async (req, res) => {
     
     const requests = await Request.find()
       .sort({ createdAt: -1 })
-      .lean(); // Convert to plain JavaScript objects for better performance
+      .lean();
 
-    console.log(`✅ Found ${requests.length} requests`);
+    // Populate consumer details for each request
+    const requestsWithConsumer = await Promise.all(
+      requests.map(async (request) => {
+        const consumer = await Consumer.findById(request.userId).select('name email phone whatsapp address bloodGroup');
+        return {
+          ...request,
+          consumer: consumer || null,
+        };
+      })
+    );
+
+    console.log(`✅ Found ${requestsWithConsumer.length} requests with consumer details`);
     
-    // Return consistent response format
     res.json({
       success: true,
-      count: requests.length,
-      data: requests
+      count: requestsWithConsumer.length,
+      data: requestsWithConsumer
     });
   } catch (err) {
     console.error("❌ Get Requests Error:", err);
@@ -51,6 +63,27 @@ export const getAllRequests = async (req, res) => {
       message: "Server error",
       error: err.message 
     });
+  }
+};
+
+// Get single request by ID with consumer details
+export const getRequestById = async (req, res) => {
+  try {
+    const request = await Request.findById(req.params.id).lean();
+    
+    if (!request) {
+      return res.status(404).json({ message: "Request not found" });
+    }
+    
+    const consumer = await Consumer.findById(request.userId).select('name email phone whatsapp address bloodGroup');
+    
+    res.json({
+      ...request,
+      consumer: consumer || null,
+    });
+  } catch (err) {
+    console.error("❌ Get Request Error:", err);
+    res.status(500).json({ message: "Server error" });
   }
 };
 

@@ -7,6 +7,7 @@ import statsRoutes from "./routes/statsRoutes.js";
 import requestRoutes from "./routes/requestRoutes.js";
 import helperRoutes from "./routes/helperRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
+import consumerRoutes from "./routes/consumerRoutes.js";
 
 dotenv.config();
 connectDB();
@@ -28,6 +29,7 @@ app.use("/api/stats", statsRoutes);
 app.use("/api/requests", requestRoutes);
 app.use("/api/helpers", helperRoutes);
 app.use("/api/auth", authRoutes);
+app.use("/api/consumers", consumerRoutes);
 
 app.get("/", (req, res) => {
   console.log("Root endpoint hit");

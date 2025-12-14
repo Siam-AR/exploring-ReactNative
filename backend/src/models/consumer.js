@@ -5,8 +5,12 @@ const consumerSchema = new mongoose.Schema(
     name: { type: String, required: true },
     email: { type: String, unique: true, required: true },
     password: { type: String, required: true },
-    bloodGroup: String,
-    address: String,
+
+    // Profile fields
+    phone: { type: String, default: "" },
+    whatsapp: { type: String, default: "" },
+    address: { type: String, default: "" },
+    bloodGroup: { type: String, default: "A+" },
   },
   { timestamps: true }
 );
