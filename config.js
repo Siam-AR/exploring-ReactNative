@@ -1,4 +1,4 @@
-// Central configuration file for API endpoint
+﻿// Central configuration file for API endpoint
 // Update this IP address when your network changes
 export const API_CONFIG = {
   HOST: '192.168.1.21',

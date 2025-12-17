@@ -1,52 +1,62 @@
-# Quick IP Update Script for MiNi Bangladesh
-# Run this when your IP address changes
+﻿# Auto-detect and update IP address for React Native project
+# Run this script whenever you change WiFi networks
 
-Write-Host "`n========================================" -ForegroundColor Cyan
-Write-Host "  MiNi Bangladesh - IP Update Helper" -ForegroundColor Cyan
-Write-Host "========================================`n" -ForegroundColor Cyan
+Write-Host "`n Auto-detecting your PC's IP address..." -ForegroundColor Cyan
 
-# Get current IP
-Write-Host "Finding your current IP address...`n" -ForegroundColor Yellow
-$ipAddress = (Get-NetIPAddress -AddressFamily IPv4 -InterfaceAlias "Wi-Fi*" -ErrorAction SilentlyContinue | Where-Object {$_.IPAddress -like "192.168.*"}).IPAddress
-
-if (-not $ipAddress) {
-    $ipAddress = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object {$_.IPAddress -like "192.168.*"} | Select-Object -First 1).IPAddress
-}
-
-if ($ipAddress) {
-    Write-Host "Current IP detected: $ipAddress" -ForegroundColor Green
-    $useDetected = Read-Host "`nUse this IP? (y/n)"
-    
-    if ($useDetected -ne "y") {
-        $ipAddress = Read-Host "Enter your IP address (e.g., 192.168.1.21)"
+# Collect candidate IPv4 addresses with default gateway (active network)
+$ipCandidates = @()
+$netConfigs = Get-NetIPConfiguration | Where-Object { $_.IPv4DefaultGateway -and $_.IPv4Address }
+foreach ($cfg in $netConfigs) {
+    foreach ($addr in $cfg.IPv4Address) {
+        $ipCandidates += [pscustomobject]@{
+            IPAddress      = $addr.IPAddress
+            InterfaceAlias = $cfg.InterfaceAlias
+            IsWiFi         = ($cfg.InterfaceAlias -like '*Wi-Fi*' -or $cfg.InterfaceAlias -like '*Wireless*')
+            IsVirtual      = ($cfg.InterfaceAlias -like '*vEthernet*' -or $cfg.InterfaceAlias -like '*Virtual*' -or $cfg.InterfaceAlias -like '*VMware*' -or $cfg.InterfaceAlias -like '*Hyper-V*')
+        }
     }
-} else {
-    Write-Host "Could not auto-detect IP." -ForegroundColor Red
-    $ipAddress = Read-Host "Enter your IP address (e.g., 192.168.1.21)"
 }
 
-Write-Host "`nUpdating configuration files...`n" -ForegroundColor Yellow
+# Fallback: any non-loopback, non-APIPA
+if (-not $ipCandidates) {
+    $fallback = Get-NetIPAddress -AddressFamily IPv4 |
+        Where-Object { $_.IPAddress -notlike '169.254.*' -and $_.IPAddress -ne '127.0.0.1' }
+    foreach ($f in $fallback) {
+        $ipCandidates += [pscustomobject]@{
+            IPAddress      = $f.IPAddress
+            InterfaceAlias = $f.InterfaceAlias
+            IsWiFi         = ($f.InterfaceAlias -like '*Wi-Fi*' -or $f.InterfaceAlias -like '*Wireless*')
+            IsVirtual      = ($f.InterfaceAlias -like '*vEthernet*' -or $f.InterfaceAlias -like '*Virtual*' -or $f.InterfaceAlias -like '*VMware*' -or $f.InterfaceAlias -like '*Hyper-V*')
+        }
+    }
+}
+
+# Choose best candidate: prefer Wi-Fi, exclude virtual adapters
+$ip = $ipCandidates |
+    Where-Object { -not $_.IsVirtual -and $_.IPAddress -notlike '169.254.*' -and $_.IPAddress -ne '127.0.0.1' } |
+    Sort-Object @{Expression = { -not $_.IsWiFi }}, InterfaceAlias |
+    Select-Object -First 1 -ExpandProperty IPAddress
+
+if (-not $ip) {
+    Write-Host " Could not detect IP. Please check your network connection." -ForegroundColor Red
+    exit 1
+}
+
+Write-Host " Detected IP: $ip" -ForegroundColor Green
 
 # Update config.js
-$configFile = "config.js"
-$configContent = Get-Content $configFile -Raw
-$newConfigContent = $configContent -replace "HOST: '[^']*'", "HOST: '$ipAddress'"
-Set-Content $configFile $newConfigContent
-Write-Host "✓ Updated: config.js" -ForegroundColor Green
+$configPath = "$PSScriptRoot\config.js"
+if (Test-Path $configPath) {
+    $configContent = Get-Content $configPath -Raw
+    $configContent = $configContent -replace "HOST: '[0-9.]+',", "HOST: '$ip',"
+    $configContent | Set-Content $configPath -Encoding UTF8 -NoNewline
+    Write-Host " Updated config.js" -ForegroundColor Green
+} else {
+    Write-Host "  config.js not found" -ForegroundColor Yellow
+}
 
-# Update network_security_config.xml
-$xmlFile = "android\app\src\main\res\xml\network_security_config.xml"
-$xmlContent = Get-Content $xmlFile -Raw
-$newXmlContent = $xmlContent -replace '<domain includeSubdomains="true">192\.168\.\d+\.\d+</domain>', "<domain includeSubdomains=`"true`">$ipAddress</domain>"
-Set-Content $xmlFile $newXmlContent
-Write-Host "✓ Updated: network_security_config.xml" -ForegroundColor Green
-
-Write-Host "`n========================================" -ForegroundColor Cyan
-Write-Host "  Configuration Updated Successfully!" -ForegroundColor Green
-Write-Host "========================================`n" -ForegroundColor Cyan
-
-Write-Host "Next steps:" -ForegroundColor Yellow
-Write-Host "1. Rebuild the app: npx react-native run-android" -ForegroundColor White
-Write-Host "2. Restart backend: cd backend && npm run dev`n" -ForegroundColor White
-
-Read-Host "Press Enter to exit"
+Write-Host "`n Next steps:" -ForegroundColor Cyan
+Write-Host "   1. Restart Metro Bundler (press 'r' or restart terminal)" -ForegroundColor White
+Write-Host "   2. Reload app on device (shake device  Reload)" -ForegroundColor White
+Write-Host "   3. Make sure device is on same WiFi network" -ForegroundColor White
+Write-Host "`n All done! Your app will use: http://${ip}:5000`n" -ForegroundColor Green

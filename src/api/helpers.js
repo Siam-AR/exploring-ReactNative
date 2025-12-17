@@ -1,6 +1,7 @@
-import axios from "axios";
+﻿import axios from "axios";
+import { API_CONFIG } from "../../config.js";
 
-const API_BASE = "http://192.168.1.21:5000";
+const API_BASE = API_CONFIG.BASE_URL;
 
 // GET ALL HELPERS with optional filters
 export const getHelpers = async (filters = {}) => {
@@ -14,12 +15,12 @@ export const getHelpers = async (filters = {}) => {
     const queryString = params.toString();
     const url = `${API_BASE}/api/helpers${queryString ? '?' + queryString : ''}`;
     
-    console.log("📡 Fetching helpers:", url);
+    console.log(" Fetching helpers:", url);
     const res = await axios.get(url);
-    console.log(`✅ Fetched ${res.data.length} helpers`);
+    console.log(` Fetched ${res.data.length} helpers`);
     return res.data;
   } catch (err) {
-    console.log("❌ Get Helpers Error:", err.message);
+    console.log(" Get Helpers Error:", err.message);
     throw err.response?.data || { message: "Network error" };
   }
 };
@@ -27,12 +28,12 @@ export const getHelpers = async (filters = {}) => {
 // GET HELPER BY ID
 export const getHelperById = async (id) => {
   try {
-    console.log("📡 Fetching helper:", id);
+    console.log(" Fetching helper:", id);
     const res = await axios.get(`${API_BASE}/api/helpers/${id}`);
-    console.log("✅ Helper fetched");
+    console.log(" Helper fetched");
     return res.data;
   } catch (err) {
-    console.log("❌ Get Helper Error:", err.message);
+    console.log(" Get Helper Error:", err.message);
     throw err.response?.data || { message: "Network error" };
   }
 };
@@ -40,14 +41,14 @@ export const getHelperById = async (id) => {
 // GET MY PROFILE (Protected - Helper only)
 export const getMyProfile = async (token) => {
   try {
-    console.log("📡 Fetching my helper profile");
+    console.log(" Fetching my helper profile");
     const res = await axios.get(`${API_BASE}/api/helpers/me/profile`, {
       headers: { Authorization: `Bearer ${token}` },
     });
-    console.log("✅ My profile fetched");
+    console.log(" My profile fetched");
     return res.data;
   } catch (err) {
-    console.log("❌ Get My Profile Error:", err.message);
+    console.log(" Get My Profile Error:", err.message);
     throw err.response?.data || { message: "Network error" };
   }
 };
@@ -55,14 +56,14 @@ export const getMyProfile = async (token) => {
 // UPDATE MY PROFILE (Protected - Helper only)
 export const updateMyProfile = async (token, data) => {
   try {
-    console.log("📝 Updating my helper profile:", data);
+    console.log(" Updating my helper profile:", data);
     const res = await axios.put(`${API_BASE}/api/helpers/me/profile`, data, {
       headers: { Authorization: `Bearer ${token}` },
     });
-    console.log("✅ Profile updated successfully");
+    console.log(" My profile updated successfully");
     return res.data;
   } catch (err) {
-    console.log("❌ Update Profile Error:", err.message);
+    console.log(" Update My Profile Error:", err.message);
     throw err.response?.data || { message: "Network error" };
   }
 };
